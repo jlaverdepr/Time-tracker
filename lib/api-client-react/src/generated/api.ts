@@ -23,15 +23,21 @@ import type {
   DaySummary,
   GetCalendarParams,
   GetRecentSessionsParams,
+  GetSubprojectCalendarEventsParams,
   HealthStatus,
   ListSessionsParams,
+  ListSubprojectsParams,
   Project,
   ProjectInput,
   ProjectUpdate,
   Session,
   SessionInput,
   SessionUpdate,
-  Stats
+  Stats,
+  Subproject,
+  SubprojectCalendarEvent,
+  SubprojectInput,
+  SubprojectUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -425,6 +431,665 @@ export const useDeleteProject = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteProjectMutationOptions(options));
+    }
+
+export const getCompleteProjectUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/complete`
+}
+
+/**
+ * @summary Mark a project as completed
+ */
+export const completeProject = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getCompleteProjectUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCompleteProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeProject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeProject>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['completeProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeProject>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  completeProject(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteProjectMutationResult = NonNullable<Awaited<ReturnType<typeof completeProject>>>
+
+    export type CompleteProjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark a project as completed
+ */
+export const useCompleteProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeProject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeProject>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCompleteProjectMutationOptions(options));
+    }
+
+export const getReopenProjectUrl = (id: number,) => {
+
+
+
+
+  return `/api/projects/${id}/reopen`
+}
+
+/**
+ * @summary Reopen a completed project
+ */
+export const reopenProject = async (id: number, options?: RequestInit): Promise<Project> => {
+
+  return customFetch<Project>(getReopenProjectUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReopenProjectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenProject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reopenProject>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['reopenProject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reopenProject>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  reopenProject(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReopenProjectMutationResult = NonNullable<Awaited<ReturnType<typeof reopenProject>>>
+
+    export type ReopenProjectMutationError = ErrorType<void>
+
+    /**
+ * @summary Reopen a completed project
+ */
+export const useReopenProject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenProject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reopenProject>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getReopenProjectMutationOptions(options));
+    }
+
+export const getListSubprojectsUrl = (params?: ListSubprojectsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/subprojects?${stringifiedParams}` : `/api/subprojects`
+}
+
+/**
+ * @summary List subprojects, optionally filtered by project
+ */
+export const listSubprojects = async (params?: ListSubprojectsParams, options?: RequestInit): Promise<Subproject[]> => {
+
+  return customFetch<Subproject[]>(getListSubprojectsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListSubprojectsQueryKey = (params?: ListSubprojectsParams,) => {
+    return [
+    `/api/subprojects`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListSubprojectsQueryOptions = <TData = Awaited<ReturnType<typeof listSubprojects>>, TError = ErrorType<unknown>>(params?: ListSubprojectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSubprojects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListSubprojectsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listSubprojects>>> = ({ signal }) => listSubprojects(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listSubprojects>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListSubprojectsQueryResult = NonNullable<Awaited<ReturnType<typeof listSubprojects>>>
+export type ListSubprojectsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List subprojects, optionally filtered by project
+ */
+
+export function useListSubprojects<TData = Awaited<ReturnType<typeof listSubprojects>>, TError = ErrorType<unknown>>(
+ params?: ListSubprojectsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listSubprojects>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListSubprojectsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateSubprojectUrl = () => {
+
+
+
+
+  return `/api/subprojects`
+}
+
+/**
+ * @summary Create a subproject
+ */
+export const createSubproject = async (subprojectInput: SubprojectInput, options?: RequestInit): Promise<Subproject> => {
+
+  return customFetch<Subproject>(getCreateSubprojectUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(subprojectInput)
+  }
+);}
+
+
+
+
+export const getCreateSubprojectMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubproject>>, TError,{data: BodyType<SubprojectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSubproject>>, TError,{data: BodyType<SubprojectInput>}, TContext> => {
+
+const mutationKey = ['createSubproject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSubproject>>, {data: BodyType<SubprojectInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createSubproject(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSubprojectMutationResult = NonNullable<Awaited<ReturnType<typeof createSubproject>>>
+    export type CreateSubprojectMutationBody = BodyType<SubprojectInput>
+    export type CreateSubprojectMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a subproject
+ */
+export const useCreateSubproject = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSubproject>>, TError,{data: BodyType<SubprojectInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSubproject>>,
+        TError,
+        {data: BodyType<SubprojectInput>},
+        TContext
+      > => {
+      return useMutation(getCreateSubprojectMutationOptions(options));
+    }
+
+export const getGetSubprojectCalendarEventsUrl = (params: GetSubprojectCalendarEventsParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/subprojects/calendar-events?${stringifiedParams}` : `/api/subprojects/calendar-events`
+}
+
+/**
+ * @summary Get per-day subproject activity and completion events for a date range
+ */
+export const getSubprojectCalendarEvents = async (params: GetSubprojectCalendarEventsParams, options?: RequestInit): Promise<SubprojectCalendarEvent[]> => {
+
+  return customFetch<SubprojectCalendarEvent[]>(getGetSubprojectCalendarEventsUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetSubprojectCalendarEventsQueryKey = (params?: GetSubprojectCalendarEventsParams,) => {
+    return [
+    `/api/subprojects/calendar-events`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetSubprojectCalendarEventsQueryOptions = <TData = Awaited<ReturnType<typeof getSubprojectCalendarEvents>>, TError = ErrorType<unknown>>(params: GetSubprojectCalendarEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubprojectCalendarEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetSubprojectCalendarEventsQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getSubprojectCalendarEvents>>> = ({ signal }) => getSubprojectCalendarEvents(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getSubprojectCalendarEvents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetSubprojectCalendarEventsQueryResult = NonNullable<Awaited<ReturnType<typeof getSubprojectCalendarEvents>>>
+export type GetSubprojectCalendarEventsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get per-day subproject activity and completion events for a date range
+ */
+
+export function useGetSubprojectCalendarEvents<TData = Awaited<ReturnType<typeof getSubprojectCalendarEvents>>, TError = ErrorType<unknown>>(
+ params: GetSubprojectCalendarEventsParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getSubprojectCalendarEvents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetSubprojectCalendarEventsQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateSubprojectUrl = (id: number,) => {
+
+
+
+
+  return `/api/subprojects/${id}`
+}
+
+/**
+ * @summary Update a subproject
+ */
+export const updateSubproject = async (id: number,
+    subprojectUpdate: SubprojectUpdate, options?: RequestInit): Promise<Subproject> => {
+
+  return customFetch<Subproject>(getUpdateSubprojectUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(subprojectUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateSubprojectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubproject>>, TError,{id: number;data: BodyType<SubprojectUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateSubproject>>, TError,{id: number;data: BodyType<SubprojectUpdate>}, TContext> => {
+
+const mutationKey = ['updateSubproject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateSubproject>>, {id: number;data: BodyType<SubprojectUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateSubproject(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateSubprojectMutationResult = NonNullable<Awaited<ReturnType<typeof updateSubproject>>>
+    export type UpdateSubprojectMutationBody = BodyType<SubprojectUpdate>
+    export type UpdateSubprojectMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a subproject
+ */
+export const useUpdateSubproject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateSubproject>>, TError,{id: number;data: BodyType<SubprojectUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateSubproject>>,
+        TError,
+        {id: number;data: BodyType<SubprojectUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateSubprojectMutationOptions(options));
+    }
+
+export const getDeleteSubprojectUrl = (id: number,) => {
+
+
+
+
+  return `/api/subprojects/${id}`
+}
+
+/**
+ * @summary Delete a subproject
+ */
+export const deleteSubproject = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteSubprojectUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteSubprojectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSubproject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteSubproject>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteSubproject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteSubproject>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteSubproject(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteSubprojectMutationResult = NonNullable<Awaited<ReturnType<typeof deleteSubproject>>>
+
+    export type DeleteSubprojectMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a subproject
+ */
+export const useDeleteSubproject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteSubproject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteSubproject>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteSubprojectMutationOptions(options));
+    }
+
+export const getCompleteSubprojectUrl = (id: number,) => {
+
+
+
+
+  return `/api/subprojects/${id}/complete`
+}
+
+/**
+ * @summary Mark a subproject as completed
+ */
+export const completeSubproject = async (id: number, options?: RequestInit): Promise<Subproject> => {
+
+  return customFetch<Subproject>(getCompleteSubprojectUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCompleteSubprojectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeSubproject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeSubproject>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['completeSubproject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeSubproject>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  completeSubproject(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteSubprojectMutationResult = NonNullable<Awaited<ReturnType<typeof completeSubproject>>>
+
+    export type CompleteSubprojectMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark a subproject as completed
+ */
+export const useCompleteSubproject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeSubproject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeSubproject>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCompleteSubprojectMutationOptions(options));
+    }
+
+export const getReopenSubprojectUrl = (id: number,) => {
+
+
+
+
+  return `/api/subprojects/${id}/reopen`
+}
+
+/**
+ * @summary Reopen a completed subproject
+ */
+export const reopenSubproject = async (id: number, options?: RequestInit): Promise<Subproject> => {
+
+  return customFetch<Subproject>(getReopenSubprojectUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getReopenSubprojectMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenSubproject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reopenSubproject>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['reopenSubproject'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reopenSubproject>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  reopenSubproject(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReopenSubprojectMutationResult = NonNullable<Awaited<ReturnType<typeof reopenSubproject>>>
+
+    export type ReopenSubprojectMutationError = ErrorType<void>
+
+    /**
+ * @summary Reopen a completed subproject
+ */
+export const useReopenSubproject = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reopenSubproject>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reopenSubproject>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getReopenSubprojectMutationOptions(options));
     }
 
 export const getListSessionsUrl = (params?: ListSessionsParams,) => {

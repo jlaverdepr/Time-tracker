@@ -31,10 +31,12 @@ import { z } from "zod"
 import {
   useCreateSession,
   useListProjects,
+  useListSubprojects,
   getGetStatsQueryKey,
   getListSessionsQueryKey,
   getGetRecentSessionsQueryKey,
   getGetCalendarQueryKey,
+  getGetSubprojectCalendarEventsQueryKey,
 } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
@@ -53,7 +55,6 @@ function formatElapsed(seconds: number) {
   return `${pad(m)}:${pad(s)}`
 }
 
-/** Formats a Date as "HH:MM" for the time inputs */
 function toHHMM(d: Date) {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
@@ -62,6 +63,7 @@ function toHHMM(d: Date) {
 
 const saveSchema = z.object({
   projectId: z.string().optional().nullable(),
+  subprojectId: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 })
 type SaveValues = z.infer<typeof saveSchema>
@@ -78,15 +80,26 @@ export function ActiveTimer() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { data: projects } = useListProjects()
+  const { data: allSubprojects } = useListSubprojects()
   const createSession = useCreateSession()
 
   const form = useForm<SaveValues>({
     resolver: zodResolver(saveSchema),
-    defaultValues: { projectId: null, notes: "" },
+    defaultValues: { projectId: null, subprojectId: null, notes: "" },
   })
 
-  // tick every second while running — derive elapsed from wall clock so
-  // browser tab throttling cannot cause the timer to under-count
+  const selectedProjectId = form.watch("projectId")
+
+  const availableSubprojects = React.useMemo(() => {
+    if (!selectedProjectId || selectedProjectId === "none" || !allSubprojects) return []
+    return allSubprojects.filter(s => s.projectId === Number(selectedProjectId) && s.status === "active")
+  }, [selectedProjectId, allSubprojects])
+
+  React.useEffect(() => {
+    form.setValue("subprojectId", null)
+  }, [selectedProjectId, form])
+
+  // tick every second — derive elapsed from wall clock so tab throttling can't drift it
   React.useEffect(() => {
     if (isRunning && startedAt) {
       intervalRef.current = setInterval(() => {
@@ -109,7 +122,6 @@ export function ActiveTimer() {
   function handleStop() {
     setIsRunning(false)
     if (elapsed < 1) {
-      // nothing meaningful to save
       setStartedAt(null)
       return
     }
@@ -131,10 +143,8 @@ export function ActiveTimer() {
     createSession.mutate(
       {
         data: {
-          projectId:
-            values.projectId && values.projectId !== "none"
-              ? Number(values.projectId)
-              : null,
+          projectId: values.projectId && values.projectId !== "none" ? Number(values.projectId) : null,
+          subprojectId: values.subprojectId && values.subprojectId !== "none" ? Number(values.subprojectId) : null,
           date: format(startedAt, "yyyy-MM-dd"),
           startTime: toHHMM(startedAt),
           endTime: toHHMM(stoppedAt),
@@ -144,23 +154,16 @@ export function ActiveTimer() {
       },
       {
         onSuccess: () => {
-          toast({
-            title: "Session logged",
-            description: `${formatElapsed(elapsed)} recorded.`,
-          })
+          toast({ title: "Session logged", description: `${formatElapsed(elapsed)} recorded.` })
           queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() })
           queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() })
-          queryClient.invalidateQueries({
-            queryKey: getGetRecentSessionsQueryKey(),
-          })
+          queryClient.invalidateQueries({ queryKey: getGetRecentSessionsQueryKey() })
           queryClient.invalidateQueries({ queryKey: getGetCalendarQueryKey() })
+          queryClient.invalidateQueries({ queryKey: getGetSubprojectCalendarEventsQueryKey() })
           handleDiscard()
         },
         onError: () => {
-          toast({
-            title: "Error saving session",
-            variant: "destructive",
-          })
+          toast({ title: "Error saving session", variant: "destructive" })
         },
       }
     )
@@ -169,19 +172,12 @@ export function ActiveTimer() {
   return (
     <>
       {/* ── Sidebar widget ── */}
-      <div
-        className={`mx-4 mb-3 rounded-xl border p-3 transition-all duration-300 ${
-          isRunning
-            ? "border-primary/40 bg-primary/5"
-            : "border-border bg-muted/30"
-        }`}
-      >
-        {/* header row */}
+      <div className={`mx-4 mb-3 rounded-xl border p-3 transition-all duration-300 ${
+        isRunning ? "border-primary/40 bg-primary/5" : "border-border bg-muted/30"
+      }`}>
         <div className="flex items-center gap-2 mb-2.5">
           <Timer className={`h-3.5 w-3.5 ${isRunning ? "text-primary" : "text-muted-foreground"}`} />
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Timer
-          </span>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Timer</span>
           {isRunning && (
             <span className="ml-auto flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-primary opacity-75" />
@@ -190,33 +186,19 @@ export function ActiveTimer() {
           )}
         </div>
 
-        {/* elapsed display */}
-        <div
-          className={`font-mono text-2xl font-bold tracking-tighter mb-3 transition-colors ${
-            isRunning ? "text-primary" : "text-muted-foreground/40"
-          }`}
-        >
+        <div className={`font-mono text-2xl font-bold tracking-tighter mb-3 transition-colors ${
+          isRunning ? "text-primary" : "text-muted-foreground/40"
+        }`}>
           {formatElapsed(elapsed)}
         </div>
 
-        {/* action button */}
         {isRunning ? (
-          <Button
-            size="sm"
-            variant="destructive"
-            className="w-full gap-2 font-semibold"
-            onClick={handleStop}
-          >
+          <Button size="sm" variant="destructive" className="w-full gap-2 font-semibold" onClick={handleStop}>
             <Square className="h-3.5 w-3.5 fill-current" />
             Stop & Save
           </Button>
         ) : (
-          <Button
-            size="sm"
-            className="w-full gap-2 font-semibold"
-            variant="outline"
-            onClick={handleStart}
-          >
+          <Button size="sm" className="w-full gap-2 font-semibold" variant="outline" onClick={handleStart}>
             <Play className="h-3.5 w-3.5 fill-current" />
             Start Timer
           </Button>
@@ -224,89 +206,81 @@ export function ActiveTimer() {
       </div>
 
       {/* ── Save dialog ── */}
-      <Dialog open={saveOpen} onOpenChange={(o) => !o && handleDiscard()}>
+      <Dialog open={saveOpen} onOpenChange={o => !o && handleDiscard()}>
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
             <DialogTitle>Save Session</DialogTitle>
             <DialogDescription>
               Tracked&nbsp;
-              <span className="font-mono font-semibold text-foreground">
-                {formatElapsed(elapsed)}
-              </span>
-              . Add a project and notes before saving.
+              <span className="font-mono font-semibold text-foreground">{formatElapsed(elapsed)}</span>.
+              Add a project and notes before saving.
             </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
-            <form
-              onSubmit={form.handleSubmit(onSubmit)}
-              className="space-y-4 pt-2"
-            >
-              <FormField
-                control={form.control}
-                name="projectId"
-                render={({ field }) => (
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+
+              <FormField control={form.control} name="projectId" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Project</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || "none"}>
+                    <FormControl>
+                      <SelectTrigger><SelectValue placeholder="No project" /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">No Project</SelectItem>
+                      {projects?.map(p => (
+                        <SelectItem key={p.id} value={p.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: p.color }} />
+                            {p.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {availableSubprojects.length > 0 && (
+                <FormField control={form.control} name="subprojectId" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || "none"}
-                    >
+                    <FormLabel>Subproject <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || "none"}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="No project" />
-                        </SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder="Select subproject" /></SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="none">No Project</SelectItem>
-                        {projects?.map((p) => (
-                          <SelectItem key={p.id} value={p.id.toString()}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-3 h-3 rounded-full"
-                                style={{ backgroundColor: p.color }}
-                              />
-                              {p.name}
-                            </div>
-                          </SelectItem>
+                        <SelectItem value="none">None</SelectItem>
+                        {availableSubprojects.map(s => (
+                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
-                )}
-              />
+                )} />
+              )}
 
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="What did you work on?"
-                        {...field}
-                        value={field.value || ""}
-                        autoFocus
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <FormField control={form.control} name="notes" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Notes</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="What did you work on?"
+                      {...field}
+                      value={field.value || ""}
+                      autoFocus={availableSubprojects.length === 0}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
 
               <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleDiscard}
-                >
-                  Discard
-                </Button>
-                <Button type="submit" disabled={createSession.isPending}>
-                  Save Session
-                </Button>
+                <Button type="button" variant="ghost" onClick={handleDiscard}>Discard</Button>
+                <Button type="submit" disabled={createSession.isPending}>Save Session</Button>
               </div>
             </form>
           </Form>

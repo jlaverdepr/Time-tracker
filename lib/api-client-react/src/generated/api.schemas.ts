@@ -14,6 +14,10 @@ export interface Project {
   name: string;
   /** Hex color e.g. #3B82F6 */
   color: string;
+  /** 'active' or 'completed' */
+  status: string;
+  /** @nullable */
+  completedAt?: string | null;
   createdAt: string;
 }
 
@@ -29,6 +33,51 @@ export interface ProjectUpdate {
   color?: string;
 }
 
+export interface Subproject {
+  id: number;
+  projectId: number;
+  name: string;
+  /**
+     * Hex color; null means inherit from parent project
+     * @nullable
+     */
+  color?: string | null;
+  /** 'active' or 'completed' */
+  status: string;
+  /** @nullable */
+  completedAt?: string | null;
+  createdAt: string;
+}
+
+export interface SubprojectInput {
+  projectId: number;
+  /** @minLength 1 */
+  name: string;
+  /** @nullable */
+  color?: string | null;
+}
+
+export interface SubprojectUpdate {
+  /** @minLength 1 */
+  name?: string;
+  /** @nullable */
+  color?: string | null;
+}
+
+export interface SubprojectCalendarEvent {
+  /** YYYY-MM-DD */
+  date: string;
+  subprojectId: number;
+  subprojectName: string;
+  /** @nullable */
+  subprojectColor?: string | null;
+  projectId: number;
+  projectName: string;
+  projectColor: string;
+  /** 'active' (had sessions) or 'completed' (completion date) */
+  eventType: string;
+}
+
 export interface Session {
   id: number;
   /** @nullable */
@@ -37,6 +86,10 @@ export interface Session {
   projectName?: string | null;
   /** @nullable */
   projectColor?: string | null;
+  /** @nullable */
+  subprojectId?: number | null;
+  /** @nullable */
+  subprojectName?: string | null;
   /** YYYY-MM-DD */
   date: string;
   /**
@@ -59,6 +112,8 @@ export interface Session {
 export interface SessionInput {
   /** @nullable */
   projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
   date: string;
   /** @nullable */
   startTime?: string | null;
@@ -73,6 +128,8 @@ export interface SessionInput {
 export interface SessionUpdate {
   /** @nullable */
   projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
   date?: string;
   /** @nullable */
   startTime?: string | null;
@@ -113,6 +170,24 @@ export interface Stats {
   allTimeSessions: number;
 }
 
+export type ListSubprojectsParams = {
+/**
+ * Filter by parent project
+ */
+projectId?: number;
+};
+
+export type GetSubprojectCalendarEventsParams = {
+/**
+ * Start of range (YYYY-MM-DD)
+ */
+startDate: string;
+/**
+ * End of range (YYYY-MM-DD)
+ */
+endDate: string;
+};
+
 export type ListSessionsParams = {
 /**
  * Filter sessions on or after this date (YYYY-MM-DD)
@@ -126,6 +201,10 @@ endDate?: string;
  * Filter by project
  */
 projectId?: number;
+/**
+ * Filter by subproject
+ */
+subprojectId?: number;
 };
 
 export type GetCalendarParams = {

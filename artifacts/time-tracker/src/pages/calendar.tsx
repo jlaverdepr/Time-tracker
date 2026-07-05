@@ -1,8 +1,14 @@
 import * as React from "react"
 import { Layout } from "@/components/layout/layout"
-import { useGetCalendar, useListSessions, getListSessionsQueryKey } from "@workspace/api-client-react"
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isToday, parseISO, addMonths, subMonths } from "date-fns"
-import { CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react"
+import {
+  useGetCalendar, useListSessions, useGetSubprojectCalendarEvents,
+} from "@workspace/api-client-react"
+import type { SubprojectCalendarEvent } from "@workspace/api-client-react"
+import {
+  format, startOfMonth, endOfMonth, eachDayOfInterval,
+  isToday, parseISO, addMonths, subMonths,
+} from "date-fns"
+import { CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
@@ -25,35 +31,56 @@ export default function Calendar() {
   const startDateStr = format(monthStart, "yyyy-MM-dd")
   const endDateStr = format(monthEnd, "yyyy-MM-dd")
 
-  const { data: calendarData, isLoading } = useGetCalendar({
-    startDate: startDateStr,
-    endDate: endDateStr,
-  }, { query: { queryKey: ['calendar', startDateStr, endDateStr] } })
+  const { data: calendarData, isLoading } = useGetCalendar(
+    { startDate: startDateStr, endDate: endDateStr },
+    { query: { queryKey: ["calendar", startDateStr, endDateStr] } }
+  )
+
+  const { data: subprojectEvents } = useGetSubprojectCalendarEvents(
+    { startDate: startDateStr, endDate: endDateStr },
+    { query: { queryKey: ["subproject-events", startDateStr, endDateStr] } }
+  )
 
   const { data: selectedDaySessions, isLoading: isLoadingSessions } = useListSessions(
     { startDate: selectedDate || undefined, endDate: selectedDate || undefined },
-    { query: { enabled: !!selectedDate, queryKey: ['sessions', selectedDate] } }
+    { query: { enabled: !!selectedDate, queryKey: ["sessions", selectedDate] } }
   )
 
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
-  
-  // Pad the start with empty slots
   const startDayOfWeek = monthStart.getDay()
   const emptyDays = Array(startDayOfWeek).fill(null)
 
-  const getDayData = (date: Date) => {
-    const dStr = format(date, "yyyy-MM-dd")
-    return calendarData?.find(d => d.date === dStr)
-  }
+  // index calendar data by date
+  const dayDataByDate = React.useMemo(() => {
+    const map = new Map<string, typeof calendarData extends (infer T)[] | undefined ? T : never>()
+    for (const d of calendarData ?? []) map.set(d.date, d)
+    return map
+  }, [calendarData])
+
+  // index subproject events by date
+  const subEventsByDate = React.useMemo(() => {
+    const map = new Map<string, SubprojectCalendarEvent[]>()
+    for (const ev of subprojectEvents ?? []) {
+      if (!map.has(ev.date)) map.set(ev.date, [])
+      map.get(ev.date)!.push(ev)
+    }
+    return map
+  }, [subprojectEvents])
+
+  // subproject events for the selected day
+  const selectedDaySubEvents = selectedDate ? (subEventsByDate.get(selectedDate) ?? []) : []
 
   const getIntensityClass = (minutes: number) => {
     if (minutes === 0) return "bg-card border border-border"
-    if (minutes < 60) return "bg-primary/20 text-primary-foreground border-transparent"
-    if (minutes < 180) return "bg-primary/40 text-primary-foreground border-transparent"
-    if (minutes < 300) return "bg-primary/60 text-primary-foreground border-transparent"
-    if (minutes < 480) return "bg-primary/80 text-primary-foreground border-transparent"
-    return "bg-primary text-primary-foreground border-transparent shadow-sm"
+    if (minutes < 60) return "bg-primary/20 border-transparent"
+    if (minutes < 180) return "bg-primary/40 border-transparent"
+    if (minutes < 300) return "bg-primary/60 border-transparent"
+    if (minutes < 480) return "bg-primary/80 border-transparent"
+    return "bg-primary border-transparent shadow-sm"
   }
+
+  const getTextClass = (minutes: number) =>
+    minutes > 0 ? "text-primary-foreground" : "text-muted-foreground"
 
   return (
     <Layout>
@@ -76,12 +103,22 @@ export default function Calendar() {
           </div>
         </div>
 
+        {/* legend */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-primary/70" />
+            <span>Active subproject day</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            <span>Subproject completed</span>
+          </div>
+        </div>
+
         <div className="bg-card rounded-xl border p-6 shadow-sm">
           <div className="grid grid-cols-7 gap-2 mb-4">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center text-sm font-semibold text-muted-foreground pb-2">
-                {day}
-              </div>
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
+              <div key={d} className="text-center text-sm font-semibold text-muted-foreground pb-2">{d}</div>
             ))}
           </div>
 
@@ -94,48 +131,78 @@ export default function Calendar() {
               {emptyDays.map((_, i) => (
                 <div key={`empty-${i}`} className="h-28 rounded-xl opacity-0 pointer-events-none" />
               ))}
-              
+
               {days.map(day => {
-                const dayData = getDayData(day)
-                const minutes = dayData?.totalMinutes || 0
-                const intensityClass = getIntensityClass(minutes)
-                
+                const dStr = format(day, "yyyy-MM-dd")
+                const dayData = dayDataByDate.get(dStr)
+                const minutes = dayData?.totalMinutes ?? 0
+                const subEvents = subEventsByDate.get(dStr) ?? []
+                const completedEvents = subEvents.filter(e => e.eventType === "completed")
+                const activeEvents = subEvents.filter(e => e.eventType === "active")
+
                 return (
                   <button
-                    key={day.toISOString()}
-                    onClick={() => setSelectedDate(format(day, "yyyy-MM-dd"))}
+                    key={dStr}
+                    onClick={() => setSelectedDate(dStr)}
                     className={cn(
                       "h-28 rounded-xl p-3 flex flex-col justify-between transition-all relative overflow-hidden group hover:ring-2 hover:ring-primary hover:ring-offset-2 hover:ring-offset-background",
-                      intensityClass,
+                      getIntensityClass(minutes),
                       isToday(day) && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                       minutes === 0 && "hover:bg-muted"
                     )}
                   >
+                    {/* day number */}
                     <span className={cn(
                       "text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full",
-                      minutes > 0 ? "text-primary-foreground opacity-90" : "text-muted-foreground"
+                      getTextClass(minutes)
                     )}>
                       {format(day, "d")}
                     </span>
-                    
-                    {minutes > 0 && (
-                      <div className="text-right w-full">
-                        <div className="font-mono text-xs md:text-sm font-semibold text-primary-foreground">
-                          {formatDuration(minutes)}
-                        </div>
-                        {dayData?.projectBreakdown && (
-                          <div className="flex gap-1 mt-1 justify-end flex-wrap">
-                            {dayData.projectBreakdown.map((p, idx) => (
-                              <div 
-                                key={idx} 
-                                className="w-1.5 h-1.5 rounded-full bg-white opacity-80"
-                                title={p.projectName || "Unassigned"}
-                              />
-                            ))}
+
+                    <div className="w-full space-y-1">
+                      {/* duration */}
+                      {minutes > 0 && (
+                        <div className="text-right">
+                          <div className={cn("font-mono text-xs font-semibold", getTextClass(minutes))}>
+                            {formatDuration(minutes)}
                           </div>
-                        )}
-                      </div>
-                    )}
+                        </div>
+                      )}
+
+                      {/* subproject event indicators */}
+                      {(activeEvents.length > 0 || completedEvents.length > 0) && (
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {/* completion checkmarks — show up to 3 */}
+                          {completedEvents.slice(0, 3).map((ev, idx) => (
+                            <div
+                              key={`c-${idx}`}
+                              className="flex items-center justify-center w-4 h-4 rounded-full bg-white/90 shadow-sm"
+                              title={`✓ ${ev.subprojectName}`}
+                            >
+                              <CheckCircle2
+                                className="h-3 w-3"
+                                style={{ color: ev.subprojectColor ?? ev.projectColor }}
+                              />
+                            </div>
+                          ))}
+                          {/* active dots */}
+                          {activeEvents.slice(0, 4).map((ev, idx) => (
+                            <div
+                              key={`a-${idx}`}
+                              className="w-2 h-2 rounded-full border border-white/50 shadow-sm"
+                              style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }}
+                              title={ev.subprojectName}
+                            />
+                          ))}
+                          {/* overflow indicator */}
+                          {(activeEvents.length + completedEvents.length > 7) && (
+                            <div className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center">
+                              <span className="text-[9px] font-bold text-white">+</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </button>
                 )
               })}
@@ -144,62 +211,117 @@ export default function Calendar() {
         </div>
       </div>
 
-      <Sheet open={!!selectedDate} onOpenChange={(open) => !open && setSelectedDate(null)}>
+      {/* ── Day detail sheet ── */}
+      <Sheet open={!!selectedDate} onOpenChange={open => !open && setSelectedDate(null)}>
         <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
           <div className="p-6 border-b bg-muted/30">
             <SheetHeader>
               <SheetTitle>
                 {selectedDate ? format(parseISO(selectedDate), "EEEE, MMMM do, yyyy") : ""}
               </SheetTitle>
-              <SheetDescription>
-                Details of your work sessions for this day.
-              </SheetDescription>
+              <SheetDescription>Work sessions and subproject activity.</SheetDescription>
             </SheetHeader>
           </div>
-          
+
           <ScrollArea className="flex-1 p-6">
-            {isLoadingSessions ? (
-              <div className="text-center text-muted-foreground">Loading sessions...</div>
-            ) : !selectedDaySessions || selectedDaySessions.length === 0 ? (
-              <div className="text-center text-muted-foreground py-12 flex flex-col items-center gap-3">
-                <CalendarIcon className="h-12 w-12 text-muted-foreground/30" />
-                <p>No sessions recorded on this day.</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {selectedDaySessions.map(session => (
-                  <div key={session.id} className="p-4 rounded-lg border bg-card shadow-sm flex flex-col gap-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2">
-                        {session.projectName ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: session.projectColor || "#ccc" }} />
-                            <span className="font-semibold">{session.projectName}</span>
+            <div className="space-y-6">
+
+              {/* subproject completions for this day */}
+              {selectedDaySubEvents.filter(e => e.eventType === "completed").length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Completed
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedDaySubEvents
+                      .filter(e => e.eventType === "completed")
+                      .map((ev, idx) => (
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/50 border-emerald-100">
+                          <div
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{ev.subprojectName}</p>
+                            <p className="text-xs text-muted-foreground">{ev.projectName}</p>
                           </div>
-                        ) : (
-                          <span className="font-semibold text-muted-foreground">Unassigned</span>
+                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* active subprojects worked on this day */}
+              {selectedDaySubEvents.filter(e => e.eventType === "active").length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Subprojects Worked On
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedDaySubEvents
+                      .filter(e => e.eventType === "active")
+                      .map((ev, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-card text-xs font-medium">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }}
+                          />
+                          {ev.subprojectName}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* work sessions */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                  Sessions
+                </h3>
+                {isLoadingSessions ? (
+                  <div className="text-center text-muted-foreground text-sm">Loading sessions...</div>
+                ) : !selectedDaySessions || selectedDaySessions.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8 flex flex-col items-center gap-3">
+                    <CalendarIcon className="h-10 w-10 text-muted-foreground/30" />
+                    <p className="text-sm">No sessions recorded on this day.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedDaySessions.map(session => (
+                      <div key={session.id} className="p-4 rounded-lg border bg-card shadow-sm flex flex-col gap-2">
+                        <div className="flex items-start justify-between">
+                          <div className="space-y-0.5">
+                            {session.projectName ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: session.projectColor ?? "#ccc" }} />
+                                <span className="font-semibold text-sm">{session.projectName}</span>
+                              </div>
+                            ) : (
+                              <span className="font-semibold text-sm text-muted-foreground">Unassigned</span>
+                            )}
+                            {session.subprojectName && (
+                              <p className="text-xs text-muted-foreground pl-4.5 ml-4">↳ {session.subprojectName}</p>
+                            )}
+                          </div>
+                          <div className="font-mono font-bold text-primary text-sm">{formatDuration(session.durationMinutes)}</div>
+                        </div>
+                        {(session.startTime || session.endTime) && (
+                          <div className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded w-fit">
+                            {session.startTime || "???"} – {session.endTime || "???"}
+                          </div>
+                        )}
+                        {session.notes && (
+                          <p className="text-sm text-card-foreground bg-secondary/30 p-3 rounded-md border border-secondary">
+                            {session.notes}
+                          </p>
                         )}
                       </div>
-                      <div className="font-mono font-bold text-primary">
-                        {formatDuration(session.durationMinutes)}
-                      </div>
-                    </div>
-                    
-                    {(session.startTime || session.endTime) && (
-                      <div className="text-xs font-mono text-muted-foreground bg-muted/50 inline-flex px-2 py-1 rounded w-fit">
-                        {session.startTime || "???"} - {session.endTime || "???"}
-                      </div>
-                    )}
-                    
-                    {session.notes && (
-                      <p className="text-sm text-card-foreground bg-secondary/30 p-3 rounded-md border border-secondary">
-                        {session.notes}
-                      </p>
-                    )}
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            )}
+            </div>
           </ScrollArea>
         </SheetContent>
       </Sheet>

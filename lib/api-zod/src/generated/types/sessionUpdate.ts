@@ -9,6 +9,8 @@
 export interface SessionUpdate {
   /** @nullable */
   projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
   date?: string;
   /** @nullable */
   startTime?: string | null;

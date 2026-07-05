@@ -12,6 +12,8 @@ tags:
     description: Health operations
   - name: projects
     description: Project operations
+  - name: subprojects
+    description: Subproject operations
   - name: sessions
     description: Work session operations
 paths:
@@ -103,6 +105,198 @@ paths:
         "404":
           description: Not found
 
+  /projects/{id}/complete:
+    post:
+      operationId: completeProject
+      tags: [projects]
+      summary: Mark a project as completed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project marked completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+
+  /projects/{id}/reopen:
+    post:
+      operationId: reopenProject
+      tags: [projects]
+      summary: Reopen a completed project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Project reopened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+
+  /subprojects:
+    get:
+      operationId: listSubprojects
+      tags: [subprojects]
+      summary: List subprojects, optionally filtered by project
+      parameters:
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by parent project"
+      responses:
+        "200":
+          description: List of subprojects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Subproject"
+    post:
+      operationId: createSubproject
+      tags: [subprojects]
+      summary: Create a subproject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubprojectInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subproject"
+
+  /subprojects/calendar-events:
+    get:
+      operationId: getSubprojectCalendarEvents
+      tags: [subprojects]
+      summary: Get per-day subproject activity and completion events for a date range
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Start of range (YYYY-MM-DD)"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "End of range (YYYY-MM-DD)"
+      responses:
+        "200":
+          description: Array of subproject calendar events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SubprojectCalendarEvent"
+
+  /subprojects/{id}:
+    patch:
+      operationId: updateSubproject
+      tags: [subprojects]
+      summary: Update a subproject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubprojectUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subproject"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSubproject
+      tags: [subprojects]
+      summary: Delete a subproject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /subprojects/{id}/complete:
+    post:
+      operationId: completeSubproject
+      tags: [subprojects]
+      summary: Mark a subproject as completed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subproject marked completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subproject"
+        "404":
+          description: Not found
+
+  /subprojects/{id}/reopen:
+    post:
+      operationId: reopenSubproject
+      tags: [subprojects]
+      summary: Reopen a completed subproject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Subproject reopened
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Subproject"
+        "404":
+          description: Not found
+
   /sessions:
     get:
       operationId: listSessions
@@ -124,6 +318,11 @@ paths:
           schema:
             type: integer
           description: "Filter by project"
+        - name: subprojectId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by subproject"
       responses:
         "200":
           description: List of sessions
@@ -286,7 +485,7 @@ components:
 
     Project:
       type: object
-      required: [id, name, color, createdAt]
+      required: [id, name, color, status, createdAt]
       properties:
         id:
           type: integer
@@ -295,6 +494,11 @@ components:
         color:
           type: string
           description: "Hex color e.g. #3B82F6"
+        status:
+          type: string
+          description: "'active' or 'completed'"
+        completedAt:
+          type: ["string", "null"]
         createdAt:
           type: string
 
@@ -317,6 +521,71 @@ components:
         color:
           type: string
 
+    Subproject:
+      type: object
+      required: [id, projectId, name, status, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: integer
+        name:
+          type: string
+        color:
+          type: ["string", "null"]
+          description: "Hex color; null means inherit from parent project"
+        status:
+          type: string
+          description: "'active' or 'completed'"
+        completedAt:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SubprojectInput:
+      type: object
+      required: [projectId, name]
+      properties:
+        projectId:
+          type: integer
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: ["string", "null"]
+
+    SubprojectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: ["string", "null"]
+
+    SubprojectCalendarEvent:
+      type: object
+      required: [date, subprojectId, subprojectName, projectId, projectName, projectColor, eventType]
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        subprojectId:
+          type: integer
+        subprojectName:
+          type: string
+        subprojectColor:
+          type: ["string", "null"]
+        projectId:
+          type: integer
+        projectName:
+          type: string
+        projectColor:
+          type: string
+        eventType:
+          type: string
+          description: "'active' (had sessions) or 'completed' (completion date)"
+
     Session:
       type: object
       required: [id, date, durationMinutes, createdAt]
@@ -328,6 +597,10 @@ components:
         projectName:
           type: ["string", "null"]
         projectColor:
+          type: ["string", "null"]
+        subprojectId:
+          type: ["integer", "null"]
+        subprojectName:
           type: ["string", "null"]
         date:
           type: string
@@ -352,6 +625,8 @@ components:
       properties:
         projectId:
           type: ["integer", "null"]
+        subprojectId:
+          type: ["integer", "null"]
         date:
           type: string
         startTime:
@@ -368,6 +643,8 @@ components:
       type: object
       properties:
         projectId:
+          type: ["integer", "null"]
+        subprojectId:
           type: ["integer", "null"]
         date:
           type: string

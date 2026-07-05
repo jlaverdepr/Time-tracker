@@ -19,4 +19,8 @@ endDate?: string;
  * Filter by project
  */
 projectId?: number;
+/**
+ * Filter by subproject
+ */
+subprojectId?: number;
 };

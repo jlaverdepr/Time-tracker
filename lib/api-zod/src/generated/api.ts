@@ -24,6 +24,8 @@ export const ListProjectsResponseItem = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "color": zod.string().describe('Hex color e.g. #3B82F6'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 export const ListProjectsResponse = zod.array(ListProjectsResponseItem)
@@ -44,6 +46,8 @@ export const CreateProjectResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "color": zod.string().describe('Hex color e.g. #3B82F6'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -67,6 +71,8 @@ export const UpdateProjectResponse = zod.object({
   "id": zod.number(),
   "name": zod.string(),
   "color": zod.string().describe('Hex color e.g. #3B82F6'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
   "createdAt": zod.string()
 })
 
@@ -82,12 +88,182 @@ export const DeleteProjectResponse = zod.void()
 
 
 /**
+ * @summary Mark a project as completed
+ */
+export const CompleteProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompleteProjectResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().describe('Hex color e.g. #3B82F6'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Reopen a completed project
+ */
+export const ReopenProjectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReopenProjectResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().describe('Hex color e.g. #3B82F6'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary List subprojects, optionally filtered by project
+ */
+export const ListSubprojectsQueryParams = zod.object({
+  "projectId": zod.coerce.number().optional().describe('Filter by parent project')
+})
+
+export const ListSubprojectsResponseItem = zod.object({
+  "id": zod.number(),
+  "projectId": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().nullish().describe('Hex color; null means inherit from parent project'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+export const ListSubprojectsResponse = zod.array(ListSubprojectsResponseItem)
+
+
+/**
+ * @summary Create a subproject
+ */
+
+
+
+export const CreateSubprojectBody = zod.object({
+  "projectId": zod.number(),
+  "name": zod.string().min(1),
+  "color": zod.string().nullish()
+})
+
+export const CreateSubprojectResponse = zod.object({
+  "id": zod.number(),
+  "projectId": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().nullish().describe('Hex color; null means inherit from parent project'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Get per-day subproject activity and completion events for a date range
+ */
+export const GetSubprojectCalendarEventsQueryParams = zod.object({
+  "startDate": zod.coerce.string().describe('Start of range (YYYY-MM-DD)'),
+  "endDate": zod.coerce.string().describe('End of range (YYYY-MM-DD)')
+})
+
+export const GetSubprojectCalendarEventsResponseItem = zod.object({
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "subprojectId": zod.number(),
+  "subprojectName": zod.string(),
+  "subprojectColor": zod.string().nullish(),
+  "projectId": zod.number(),
+  "projectName": zod.string(),
+  "projectColor": zod.string(),
+  "eventType": zod.string().describe('\'active\' (had sessions) or \'completed\' (completion date)')
+})
+export const GetSubprojectCalendarEventsResponse = zod.array(GetSubprojectCalendarEventsResponseItem)
+
+
+/**
+ * @summary Update a subproject
+ */
+export const UpdateSubprojectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateSubprojectBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "color": zod.string().nullish()
+})
+
+export const UpdateSubprojectResponse = zod.object({
+  "id": zod.number(),
+  "projectId": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().nullish().describe('Hex color; null means inherit from parent project'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a subproject
+ */
+export const DeleteSubprojectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteSubprojectResponse = zod.void()
+
+
+/**
+ * @summary Mark a subproject as completed
+ */
+export const CompleteSubprojectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompleteSubprojectResponse = zod.object({
+  "id": zod.number(),
+  "projectId": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().nullish().describe('Hex color; null means inherit from parent project'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Reopen a completed subproject
+ */
+export const ReopenSubprojectParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ReopenSubprojectResponse = zod.object({
+  "id": zod.number(),
+  "projectId": zod.number(),
+  "name": zod.string(),
+  "color": zod.string().nullish().describe('Hex color; null means inherit from parent project'),
+  "status": zod.string().describe('\'active\' or \'completed\''),
+  "completedAt": zod.string().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
  * @summary List sessions, optionally filtered by date range
  */
 export const ListSessionsQueryParams = zod.object({
   "startDate": zod.coerce.string().optional().describe('Filter sessions on or after this date (YYYY-MM-DD)'),
   "endDate": zod.coerce.string().optional().describe('Filter sessions on or before this date (YYYY-MM-DD)'),
-  "projectId": zod.coerce.number().optional().describe('Filter by project')
+  "projectId": zod.coerce.number().optional().describe('Filter by project'),
+  "subprojectId": zod.coerce.number().optional().describe('Filter by subproject')
 })
 
 export const ListSessionsResponseItem = zod.object({
@@ -95,6 +271,8 @@ export const ListSessionsResponseItem = zod.object({
   "projectId": zod.number().nullish(),
   "projectName": zod.string().nullish(),
   "projectColor": zod.string().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "subprojectName": zod.string().nullish(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "startTime": zod.string().nullish().describe('HH:MM (24h)'),
   "endTime": zod.string().nullish().describe('HH:MM (24h)'),
@@ -113,6 +291,7 @@ export const ListSessionsResponse = zod.array(ListSessionsResponseItem)
 
 export const CreateSessionBody = zod.object({
   "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "date": zod.string(),
   "startTime": zod.string().nullish(),
   "endTime": zod.string().nullish(),
@@ -125,6 +304,8 @@ export const CreateSessionResponse = zod.object({
   "projectId": zod.number().nullish(),
   "projectName": zod.string().nullish(),
   "projectColor": zod.string().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "subprojectName": zod.string().nullish(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "startTime": zod.string().nullish().describe('HH:MM (24h)'),
   "endTime": zod.string().nullish().describe('HH:MM (24h)'),
@@ -146,6 +327,8 @@ export const GetSessionResponse = zod.object({
   "projectId": zod.number().nullish(),
   "projectName": zod.string().nullish(),
   "projectColor": zod.string().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "subprojectName": zod.string().nullish(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "startTime": zod.string().nullish().describe('HH:MM (24h)'),
   "endTime": zod.string().nullish().describe('HH:MM (24h)'),
@@ -167,6 +350,7 @@ export const UpdateSessionParams = zod.object({
 
 export const UpdateSessionBody = zod.object({
   "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "date": zod.string().optional(),
   "startTime": zod.string().nullish(),
   "endTime": zod.string().nullish(),
@@ -179,6 +363,8 @@ export const UpdateSessionResponse = zod.object({
   "projectId": zod.number().nullish(),
   "projectName": zod.string().nullish(),
   "projectColor": zod.string().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "subprojectName": zod.string().nullish(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "startTime": zod.string().nullish().describe('HH:MM (24h)'),
   "endTime": zod.string().nullish().describe('HH:MM (24h)'),
@@ -247,6 +433,8 @@ export const GetRecentSessionsResponseItem = zod.object({
   "projectId": zod.number().nullish(),
   "projectName": zod.string().nullish(),
   "projectColor": zod.string().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "subprojectName": zod.string().nullish(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "startTime": zod.string().nullish().describe('HH:MM (24h)'),
   "endTime": zod.string().nullish().describe('HH:MM (24h)'),

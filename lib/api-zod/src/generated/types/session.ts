@@ -14,6 +14,10 @@ export interface Session {
   projectName?: string | null;
   /** @nullable */
   projectColor?: string | null;
+  /** @nullable */
+  subprojectId?: number | null;
+  /** @nullable */
+  subprojectName?: string | null;
   /** YYYY-MM-DD */
   date: string;
   /**

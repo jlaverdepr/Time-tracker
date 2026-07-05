@@ -6,11 +6,15 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface Project {
+export interface Subproject {
   id: number;
+  projectId: number;
   name: string;
-  /** Hex color e.g. #3B82F6 */
-  color: string;
+  /**
+     * Hex color; null means inherit from parent project
+     * @nullable
+     */
+  color?: string | null;
   /** 'active' or 'completed' */
   status: string;
   /** @nullable */

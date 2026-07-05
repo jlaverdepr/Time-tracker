@@ -2,16 +2,18 @@ import * as React from "react"
 import { Layout } from "@/components/layout/layout"
 import {
   useGetCalendar, useListSessions, useGetSubprojectCalendarEvents,
-  useGetTodoCalendarSummary,
+  useGetTodoCalendarSummary, useListGymWorkouts, useListGymRuns,
+  useListGymWorkoutEntries, useListGymExercises,
 } from "@workspace/api-client-react"
 import type { SubprojectCalendarEvent, TodoCalendarSummaryItem } from "@workspace/api-client-react"
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   isToday, parseISO, addMonths, subMonths,
 } from "date-fns"
-import { CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2 } from "lucide-react"
+import { CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Dumbbell, Footprints } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { categoryColor, formatPace } from "@/lib/gym-utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
@@ -46,6 +48,11 @@ export default function Calendar() {
     { startDate: startDateStr, endDate: endDateStr },
     { query: { queryKey: ["todo-calendar", startDateStr, endDateStr] } }
   )
+
+  const { data: gymWorkouts } = useListGymWorkouts()
+  const { data: gymRuns } = useListGymRuns()
+  const { data: gymEntries } = useListGymWorkoutEntries()
+  const { data: gymExercises } = useListGymExercises()
 
   const { data: selectedDaySessions, isLoading: isLoadingSessions } = useListSessions(
     { startDate: selectedDate || undefined, endDate: selectedDate || undefined },
@@ -83,9 +90,38 @@ export default function Calendar() {
     return map
   }, [todoSummary])
 
+  // set of dates that have a logged gym workout
+  const gymDatesSet = React.useMemo(() => {
+    return new Set((gymWorkouts ?? []).map(w => w.date))
+  }, [gymWorkouts])
+
+  // set of dates that have a logged run
+  const runDatesSet = React.useMemo(() => {
+    return new Set((gymRuns ?? []).map(r => r.date))
+  }, [gymRuns])
+
   // subproject + todo events for the selected day
   const selectedDaySubEvents = selectedDate ? (subEventsByDate.get(selectedDate) ?? []) : []
   const selectedDayTodos = selectedDate ? (todoByDate.get(selectedDate) ?? []) : []
+
+  // gym workouts + runs for the selected day
+  const selectedDayWorkouts = selectedDate ? (gymWorkouts ?? []).filter(w => w.date === selectedDate) : []
+  const selectedDayRuns = selectedDate ? (gymRuns ?? []).filter(r => r.date === selectedDate) : []
+
+  const exercisesById = React.useMemo(() => {
+    const map = new Map<number, { name: string; category: string }>()
+    for (const ex of gymExercises ?? []) map.set(ex.id, { name: ex.name, category: ex.category })
+    return map
+  }, [gymExercises])
+
+  const entriesByWorkout = React.useMemo(() => {
+    const map = new Map<number, { exerciseId: number }[]>()
+    for (const e of gymEntries ?? []) {
+      if (!map.has(e.workoutId)) map.set(e.workoutId, [])
+      map.get(e.workoutId)!.push(e)
+    }
+    return map
+  }, [gymEntries])
 
   const getIntensityClass = (minutes: number) => {
     if (minutes === 0) return "bg-card border border-border"
@@ -133,6 +169,18 @@ export default function Calendar() {
           <div className="flex items-center gap-1.5">
             <div className="w-4 h-4 rounded text-[9px] font-bold bg-violet-500 text-white flex items-center justify-center">T</div>
             <span>To-do list completion</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shadow-sm">
+              <Dumbbell className="h-2.5 w-2.5 text-white" />
+            </div>
+            <span>Workout logged</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full bg-sky-500 flex items-center justify-center shadow-sm">
+              <Footprints className="h-2.5 w-2.5 text-white" />
+            </div>
+            <span>Run logged</span>
           </div>
         </div>
 
@@ -182,6 +230,29 @@ export default function Calendar() {
                     )}>
                       {format(day, "d")}
                     </span>
+
+                    {/* workout indicator */}
+                    {gymDatesSet.has(dStr) && (
+                      <div
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center shadow-md z-10"
+                        title="Workout logged"
+                      >
+                        <Dumbbell className="h-3.5 w-3.5 text-white" />
+                      </div>
+                    )}
+
+                    {/* run indicator */}
+                    {runDatesSet.has(dStr) && (
+                      <div
+                        className={cn(
+                          "absolute top-1.5 w-6 h-6 rounded-full bg-sky-500 flex items-center justify-center shadow-md z-10",
+                          gymDatesSet.has(dStr) ? "right-9" : "right-1.5",
+                        )}
+                        title="Run logged"
+                      >
+                        <Footprints className="h-3.5 w-3.5 text-white" />
+                      </div>
+                    )}
 
                     <div className="w-full space-y-1">
                       {/* duration */}
@@ -291,6 +362,70 @@ export default function Calendar() {
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* gym workouts + runs */}
+              {(selectedDayWorkouts.length > 0 || selectedDayRuns.length > 0) && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Gym
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedDayWorkouts.map(workout => {
+                      const entries = entriesByWorkout.get(workout.id) ?? []
+                      return (
+                        <div key={`w-${workout.id}`} className="p-3 rounded-lg border bg-card flex items-start gap-3">
+                          <div className="h-7 w-7 rounded-full bg-orange-500 flex items-center justify-center shrink-0">
+                            <Dumbbell className="h-3.5 w-3.5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">{workout.title ?? "Workout"}</p>
+                            {entries.length > 0 ? (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
+                                {entries.map((e, idx) => {
+                                  const ex = exercisesById.get(e.exerciseId)
+                                  return (
+                                    <span key={idx}
+                                      className="text-xs px-2 py-0.5 rounded-full border bg-secondary/30 flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: categoryColor(ex?.category ?? "Minor") }} />
+                                      {ex?.name ?? "Unknown exercise"}
+                                    </span>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <p className="text-xs text-muted-foreground mt-1">No exercises logged</p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {selectedDayRuns.map(run => {
+                      const pace = run.distanceKm != null && run.durationMinutes != null
+                        ? formatPace(run.distanceKm, run.durationMinutes)
+                        : null
+                      return (
+                        <div key={`r-${run.id}`} className="p-3 rounded-lg border bg-card flex items-center gap-3">
+                          <div className="h-7 w-7 rounded-full bg-sky-500 flex items-center justify-center shrink-0">
+                            <Footprints className="h-3.5 w-3.5 text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium">Run</p>
+                          </div>
+                          {run.distanceKm != null && (
+                            <span className="text-sm font-medium tabular-nums text-sky-600">{run.distanceKm} km</span>
+                          )}
+                          {run.durationMinutes != null && (
+                            <span className="text-xs text-muted-foreground tabular-nums">{run.durationMinutes} min</span>
+                          )}
+                          {pace && (
+                            <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{pace}</span>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}

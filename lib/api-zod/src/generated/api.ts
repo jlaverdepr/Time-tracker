@@ -531,12 +531,15 @@ export const DeleteTodoListResponse = zod.void()
  * @summary List tasks, optionally filtered by list
  */
 export const ListTodoTasksQueryParams = zod.object({
-  "listId": zod.coerce.number().optional().describe('Filter by list')
+  "listId": zod.coerce.number().optional().describe('Filter by list'),
+  "projectId": zod.coerce.number().optional().describe('Filter by project')
 })
 
 export const ListTodoTasksResponseItem = zod.object({
   "id": zod.number(),
   "listId": zod.number(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
@@ -554,12 +557,16 @@ export const ListTodoTasksResponse = zod.array(ListTodoTasksResponseItem)
 
 export const CreateTodoTaskBody = zod.object({
   "listId": zod.number(),
-  "text": zod.string().min(1)
+  "text": zod.string().min(1),
+  "projectId": zod.number().optional(),
+  "subprojectId": zod.number().optional()
 })
 
 export const CreateTodoTaskResponse = zod.object({
   "id": zod.number(),
   "listId": zod.number(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
@@ -600,12 +607,16 @@ export const UpdateTodoTaskParams = zod.object({
 
 
 export const UpdateTodoTaskBody = zod.object({
-  "text": zod.string().min(1).optional()
+  "text": zod.string().min(1).optional(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish()
 })
 
 export const UpdateTodoTaskResponse = zod.object({
   "id": zod.number(),
   "listId": zod.number(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
@@ -634,6 +645,8 @@ export const CompleteTodoTaskParams = zod.object({
 export const CompleteTodoTaskResponse = zod.object({
   "id": zod.number(),
   "listId": zod.number(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
@@ -652,11 +665,362 @@ export const UncompleteTodoTaskParams = zod.object({
 export const UncompleteTodoTaskResponse = zod.object({
   "id": zod.number(),
   "listId": zod.number(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
+
+
+/**
+ * @summary List all exercises
+ */
+export const ListGymExercisesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "category": zod.enum(['Upper Body', 'Lower Body', 'Full Body', 'Core', 'Minor']),
+  "createdAt": zod.string()
+})
+export const ListGymExercisesResponse = zod.array(ListGymExercisesResponseItem)
+
+
+/**
+ * @summary Create an exercise
+ */
+
+
+
+export const CreateGymExerciseBody = zod.object({
+  "name": zod.string().min(1),
+  "category": zod.enum(['Upper Body', 'Lower Body', 'Full Body', 'Core', 'Minor'])
+})
+
+export const CreateGymExerciseResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "category": zod.enum(['Upper Body', 'Lower Body', 'Full Body', 'Core', 'Minor']),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update an exercise
+ */
+export const UpdateGymExerciseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateGymExerciseBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "category": zod.enum(['Upper Body', 'Lower Body', 'Full Body', 'Core', 'Minor']).optional()
+})
+
+export const UpdateGymExerciseResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "category": zod.enum(['Upper Body', 'Lower Body', 'Full Body', 'Core', 'Minor']),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete an exercise
+ */
+export const DeleteGymExerciseParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymExerciseResponse = zod.void()
+
+
+/**
+ * @summary List all workouts
+ */
+export const ListGymWorkoutsResponseItem = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "title": zod.string().nullish().describe('\'Chest\' | \'Legs\' | \'Back\' | free text from \'Other\''),
+  "createdAt": zod.string()
+})
+export const ListGymWorkoutsResponse = zod.array(ListGymWorkoutsResponseItem)
+
+
+/**
+ * @summary Create a workout
+ */
+export const CreateGymWorkoutBody = zod.object({
+  "date": zod.string().optional().describe('YYYY-MM-DD; defaults to today if omitted'),
+  "title": zod.string().optional()
+})
+
+export const CreateGymWorkoutResponse = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "title": zod.string().nullish().describe('\'Chest\' | \'Legs\' | \'Back\' | free text from \'Other\''),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a workout's title and/or date
+ */
+export const UpdateGymWorkoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateGymWorkoutBody = zod.object({
+  "title": zod.string().nullish(),
+  "date": zod.string().optional().describe('YYYY-MM-DD')
+})
+
+export const UpdateGymWorkoutResponse = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "title": zod.string().nullish().describe('\'Chest\' | \'Legs\' | \'Back\' | free text from \'Other\''),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a workout
+ */
+export const DeleteGymWorkoutParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymWorkoutResponse = zod.void()
+
+
+/**
+ * @summary List workout entries, optionally filtered by workout
+ */
+export const ListGymWorkoutEntriesQueryParams = zod.object({
+  "workoutId": zod.coerce.number().optional().describe('Filter by workout')
+})
+
+export const ListGymWorkoutEntriesResponseItem = zod.object({
+  "id": zod.number(),
+  "workoutId": zod.number(),
+  "exerciseId": zod.number(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListGymWorkoutEntriesResponse = zod.array(ListGymWorkoutEntriesResponseItem)
+
+
+/**
+ * @summary Add an exercise entry to a workout (seeds one empty main set)
+ */
+export const CreateGymWorkoutEntryBody = zod.object({
+  "workoutId": zod.number(),
+  "exerciseId": zod.number(),
+  "sortOrder": zod.number().optional()
+})
+
+export const CreateGymWorkoutEntryResponse = zod.object({
+  "id": zod.number(),
+  "workoutId": zod.number(),
+  "exerciseId": zod.number(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a workout entry
+ */
+export const DeleteGymWorkoutEntryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymWorkoutEntryResponse = zod.void()
+
+
+/**
+ * @summary List sets, optionally filtered by entry
+ */
+export const ListGymWorkoutSetsQueryParams = zod.object({
+  "entryId": zod.coerce.number().optional().describe('Filter by workout entry')
+})
+
+export const ListGymWorkoutSetsResponseItem = zod.object({
+  "id": zod.number(),
+  "entryId": zod.number(),
+  "isWarmup": zod.boolean(),
+  "setIndex": zod.number().describe('1-5, position within its group (main or warmup)'),
+  "reps": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "failure": zod.boolean(),
+  "createdAt": zod.string()
+})
+export const ListGymWorkoutSetsResponse = zod.array(ListGymWorkoutSetsResponseItem)
+
+
+/**
+ * @summary Add a set (main or warmup) to an entry
+ */
+export const CreateGymWorkoutSetBody = zod.object({
+  "entryId": zod.number(),
+  "isWarmup": zod.boolean(),
+  "setIndex": zod.number(),
+  "reps": zod.number().optional(),
+  "weight": zod.number().optional()
+})
+
+export const CreateGymWorkoutSetResponse = zod.object({
+  "id": zod.number(),
+  "entryId": zod.number(),
+  "isWarmup": zod.boolean(),
+  "setIndex": zod.number().describe('1-5, position within its group (main or warmup)'),
+  "reps": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "failure": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a set's reps, weight, or failure flag
+ */
+export const UpdateGymWorkoutSetParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateGymWorkoutSetBody = zod.object({
+  "reps": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "failure": zod.boolean().optional()
+})
+
+export const UpdateGymWorkoutSetResponse = zod.object({
+  "id": zod.number(),
+  "entryId": zod.number(),
+  "isWarmup": zod.boolean(),
+  "setIndex": zod.number().describe('1-5, position within its group (main or warmup)'),
+  "reps": zod.number().nullish(),
+  "weight": zod.number().nullish(),
+  "failure": zod.boolean(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a set
+ */
+export const DeleteGymWorkoutSetParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymWorkoutSetResponse = zod.void()
+
+
+/**
+ * @summary List all runs
+ */
+export const ListGymRunsResponseItem = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "distanceKm": zod.number().nullish(),
+  "durationMinutes": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+export const ListGymRunsResponse = zod.array(ListGymRunsResponseItem)
+
+
+/**
+ * @summary Log a run
+ */
+export const CreateGymRunBody = zod.object({
+  "date": zod.string().optional().describe('YYYY-MM-DD; defaults to today if omitted'),
+  "distanceKm": zod.number().optional(),
+  "durationMinutes": zod.number().optional()
+})
+
+export const CreateGymRunResponse = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "distanceKm": zod.number().nullish(),
+  "durationMinutes": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a run
+ */
+export const UpdateGymRunParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateGymRunBody = zod.object({
+  "date": zod.string().optional(),
+  "distanceKm": zod.number().nullish(),
+  "durationMinutes": zod.number().nullish()
+})
+
+export const UpdateGymRunResponse = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "distanceKm": zod.number().nullish(),
+  "durationMinutes": zod.number().nullish(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a run
+ */
+export const DeleteGymRunParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymRunResponse = zod.void()
+
+
+/**
+ * @summary List all workout templates
+ */
+export const ListGymWorkoutTemplatesResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "exerciseIds": zod.array(zod.number()),
+  "createdAt": zod.string()
+})
+export const ListGymWorkoutTemplatesResponse = zod.array(ListGymWorkoutTemplatesResponseItem)
+
+
+/**
+ * @summary Save a set of exercises as a reusable template
+ */
+
+
+
+export const CreateGymWorkoutTemplateBody = zod.object({
+  "name": zod.string().min(1),
+  "exerciseIds": zod.array(zod.number())
+})
+
+export const CreateGymWorkoutTemplateResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "exerciseIds": zod.array(zod.number()),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a workout template
+ */
+export const DeleteGymWorkoutTemplateParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymWorkoutTemplateResponse = zod.void()
 
 

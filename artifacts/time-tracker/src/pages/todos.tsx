@@ -5,9 +5,10 @@ import {
   useListTodoLists, useCreateTodoList, useUpdateTodoList, useDeleteTodoList,
   useListTodoTasks, useCreateTodoTask, useUpdateTodoTask, useDeleteTodoTask,
   useCompleteTodoTask, useUncompleteTodoTask,
+  useListProjects, useListSubprojects,
   getListTodoListsQueryKey, getListTodoTasksQueryKey,
 } from "@workspace/api-client-react"
-import type { TodoList, TodoTask } from "@workspace/api-client-react"
+import type { TodoList, TodoTask, Project, Subproject } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -52,116 +53,6 @@ function completionRate(tasks: TodoTask[], resetDaily: boolean): number {
   return Math.round((done / tasks.length) * 100)
 }
 
-// ── task item ─────────────────────────────────────────────────────────────────
-
-function TaskItem({
-  task,
-  resetDaily,
-  onComplete,
-  onUncomplete,
-  onDelete,
-  onEdit,
-}: {
-  task: TodoTask
-  resetDaily: boolean
-  onComplete: (id: number) => void
-  onUncomplete: (id: number) => void
-  onDelete: (id: number) => void
-  onEdit: (task: TodoTask) => void
-}) {
-  const done = isTaskComplete(task, resetDaily)
-  const [editing, setEditing] = React.useState(false)
-  const [editValue, setEditValue] = React.useState(task.text)
-  const editRef = React.useRef<HTMLInputElement>(null)
-
-  React.useEffect(() => {
-    if (editing) editRef.current?.focus()
-  }, [editing])
-
-  function handleStartEdit() {
-    setEditValue(task.text)
-    setEditing(true)
-  }
-
-  function handleSubmitEdit() {
-    if (editValue.trim() && editValue.trim() !== task.text) {
-      onEdit({ ...task, text: editValue.trim() })
-    }
-    setEditing(false)
-  }
-
-  return (
-    <div className={cn(
-      "flex items-center gap-3 px-4 py-3 rounded-xl group transition-all border",
-      done
-        ? "bg-muted/20 border-transparent opacity-60"
-        : "bg-card border-border/60 hover:border-border shadow-sm hover:shadow"
-    )}>
-      <button
-        onClick={() => done ? onUncomplete(task.id) : onComplete(task.id)}
-        className="shrink-0 transition-transform hover:scale-110"
-        aria-label={done ? "Mark incomplete" : "Mark complete"}
-      >
-        {done
-          ? <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-          : <Circle className="h-5 w-5 text-muted-foreground/40 hover:text-primary/60" />}
-      </button>
-
-      {editing ? (
-        <div className="flex-1 flex items-center gap-2">
-          <Input
-            ref={editRef}
-            value={editValue}
-            onChange={e => setEditValue(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === "Enter") handleSubmitEdit()
-              if (e.key === "Escape") setEditing(false)
-            }}
-            className="h-7 text-sm border-primary/50 focus-visible:ring-1"
-          />
-          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={handleSubmitEdit}>
-            <Check className="h-3.5 w-3.5 text-emerald-600" />
-          </Button>
-          <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setEditing(false)}>
-            <X className="h-3.5 w-3.5 text-muted-foreground" />
-          </Button>
-        </div>
-      ) : (
-        <span
-          className={cn(
-            "flex-1 text-sm leading-snug select-none",
-            done && "line-through text-muted-foreground"
-          )}
-          onDoubleClick={!done ? handleStartEdit : undefined}
-        >
-          {task.text}
-        </span>
-      )}
-
-      {!editing && (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-          {!done && (
-            <button
-              onClick={handleStartEdit}
-              className="p-1 rounded hover:bg-muted transition-colors"
-              title="Edit"
-            >
-              <Pencil className="h-3 w-3 text-muted-foreground" />
-            </button>
-          )}
-          <button
-            onClick={() => onDelete(task.id)}
-            className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
-            title="Delete"
-          >
-            <Trash2 className="h-3 w-3 text-muted-foreground" />
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── progress ring ─────────────────────────────────────────────────────────────
 
 function ProgressRing({ pct, color, size = 28 }: { pct: number; color: string; size?: number }) {
@@ -177,39 +68,345 @@ function ProgressRing({ pct, color, size = 28 }: { pct: number; color: string; s
   )
 }
 
-// ── list tab ──────────────────────────────────────────────────────────────────
+// ── task item ─────────────────────────────────────────────────────────────────
 
-function ListTab({
-  list, tasks, isActive, onClick,
+function TaskItem({
+  task,
+  resetDaily,
+  projects,
+  subprojectsByProject,
+  onComplete,
+  onUncomplete,
+  onDelete,
+  onUpdate,
 }: {
-  list: TodoList; tasks: TodoTask[]; isActive: boolean; onClick: () => void
+  task: TodoTask
+  resetDaily: boolean
+  projects: Project[]
+  subprojectsByProject: Map<number, Subproject[]>
+  onComplete: (id: number) => void
+  onUncomplete: (id: number) => void
+  onDelete: (id: number) => void
+  onUpdate: (id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null }) => void
 }) {
-  const pct = completionRate(tasks, list.resetDaily)
+  const done = isTaskComplete(task, resetDaily)
+  const [editing, setEditing] = React.useState(false)
+  const [editValue, setEditValue] = React.useState(task.text)
+  const editRef = React.useRef<HTMLInputElement>(null)
+
+  React.useEffect(() => {
+    if (editing) editRef.current?.focus()
+  }, [editing])
+
+  function handleSubmitEdit() {
+    const trimmed = editValue.trim()
+    if (trimmed && trimmed !== task.text) onUpdate(task.id, { text: trimmed })
+    setEditing(false)
+  }
+
+  function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const pid = e.target.value ? Number(e.target.value) : null
+    onUpdate(task.id, { projectId: pid, subprojectId: null })
+  }
+
+  function handleSubprojectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const sid = e.target.value ? Number(e.target.value) : null
+    onUpdate(task.id, { subprojectId: sid })
+  }
+
+  const assignedProject = task.projectId != null ? projects.find(p => p.id === task.projectId) : null
+  const subsForProject = task.projectId != null ? (subprojectsByProject.get(task.projectId) ?? []) : []
+
   return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex items-center gap-2.5 px-4 py-2.5 rounded-xl border transition-all shrink-0 text-sm font-semibold",
-        isActive
-          ? "border-transparent text-white shadow-md"
-          : "border-border bg-card hover:border-primary/30 text-muted-foreground hover:text-foreground"
-      )}
-      style={isActive ? { backgroundColor: list.color } : {}}
-    >
-      <span
-        className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold shrink-0"
-        style={isActive ? { backgroundColor: "rgba(255,255,255,0.25)", color: "#fff" } : { backgroundColor: list.color + "22", color: list.color }}
-      >
-        {list.letter}
-      </span>
-      <span>{list.name}</span>
-      <div className={cn("ml-1", isActive ? "opacity-90" : "opacity-60")}>
-        <ProgressRing pct={pct} color={isActive ? "#fff" : list.color} size={22} />
+    <div className={cn(
+      "flex flex-col gap-1 px-3 py-2.5 rounded-xl group transition-all border",
+      done
+        ? "bg-muted/20 border-transparent opacity-60"
+        : "bg-card border-border/60 hover:border-border shadow-sm hover:shadow"
+    )}>
+      {/* main row */}
+      <div className="flex items-center gap-2.5">
+        <button
+          onClick={() => done ? onUncomplete(task.id) : onComplete(task.id)}
+          className="shrink-0 transition-transform hover:scale-110"
+        >
+          {done
+            ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+            : <Circle className="h-4 w-4 text-muted-foreground/40 hover:text-primary/60" />}
+        </button>
+
+        {editing ? (
+          <div className="flex-1 flex items-center gap-1.5">
+            <Input
+              ref={editRef}
+              value={editValue}
+              onChange={e => setEditValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter") handleSubmitEdit()
+                if (e.key === "Escape") setEditing(false)
+              }}
+              className="h-6 text-xs border-primary/50 focus-visible:ring-1 px-1.5"
+            />
+            <button className="shrink-0" onClick={handleSubmitEdit}>
+              <Check className="h-3 w-3 text-emerald-600" />
+            </button>
+            <button className="shrink-0" onClick={() => setEditing(false)}>
+              <X className="h-3 w-3 text-muted-foreground" />
+            </button>
+          </div>
+        ) : (
+          <span
+            className={cn("flex-1 text-sm leading-snug select-none min-w-0 truncate", done && "line-through text-muted-foreground")}
+            onDoubleClick={!done ? () => { setEditValue(task.text); setEditing(true) } : undefined}
+          >
+            {task.text}
+          </span>
+        )}
+
+        {!editing && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {!done && (
+              <button onClick={() => { setEditValue(task.text); setEditing(true) }}
+                className="p-1 rounded hover:bg-muted transition-colors">
+                <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+              </button>
+            )}
+            <button onClick={() => onDelete(task.id)}
+              className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors">
+              <Trash2 className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          </div>
+        )}
       </div>
-      <span className={cn("text-xs tabular-nums ml-0.5 font-normal", isActive ? "text-white/80" : "text-muted-foreground")}>
-        {pct}%
-      </span>
-    </button>
+
+      {/* project / subproject assignment row */}
+      {!editing && !done && projects.length > 0 && (
+        <div className="flex items-center gap-1.5 ml-6">
+          {assignedProject ? (
+            <>
+              <span className="h-2 w-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: assignedProject.color }} />
+              <select
+                value={task.projectId ?? ""}
+                onChange={handleProjectChange}
+                onClick={e => e.stopPropagation()}
+                className="text-xs bg-transparent border-none focus:outline-none cursor-pointer font-medium leading-none p-0 max-w-[180px] truncate"
+                style={{ color: assignedProject.color }}
+              >
+                <option value="">— remove</option>
+                {projects.filter(p => p.status === "active").map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {subsForProject.length > 0 && (
+                <>
+                  <span className="text-muted-foreground/40 text-xs">·</span>
+                  <select
+                    value={task.subprojectId ?? ""}
+                    onChange={handleSubprojectChange}
+                    onClick={e => e.stopPropagation()}
+                    className="text-xs bg-transparent border-none focus:outline-none cursor-pointer text-muted-foreground leading-none p-0 max-w-[160px] truncate"
+                  >
+                    <option value="">no subproject</option>
+                    {subsForProject.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </>
+          ) : (
+            <select
+              value=""
+              onChange={handleProjectChange}
+              onClick={e => e.stopPropagation()}
+              className="text-xs text-muted-foreground/30 bg-transparent border-none focus:outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity leading-none p-0"
+            >
+              <option value="">+ assign project</option>
+              {projects.filter(p => p.status === "active").map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── vertical resize ───────────────────────────────────────────────────────────
+
+const LIST_HEIGHT_MIN = 120
+const LIST_HEIGHT_MAX = 900
+const LIST_HEIGHT_DEFAULT = 420
+
+function useResizableHeight(storageKey: string) {
+  const [height, setHeight] = React.useState<number>(() => {
+    if (typeof window === "undefined") return LIST_HEIGHT_DEFAULT
+    const saved = Number(window.localStorage.getItem(storageKey))
+    return Number.isFinite(saved) && saved > 0 ? saved : LIST_HEIGHT_DEFAULT
+  })
+  const heightRef = React.useRef(height)
+  heightRef.current = height
+
+  const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startHeight = heightRef.current
+
+    function onMouseMove(ev: MouseEvent) {
+      const next = Math.min(LIST_HEIGHT_MAX, Math.max(LIST_HEIGHT_MIN, startHeight + (ev.clientY - startY)))
+      setHeight(next)
+    }
+    function onMouseUp() {
+      window.removeEventListener("mousemove", onMouseMove)
+      window.removeEventListener("mouseup", onMouseUp)
+      window.localStorage.setItem(storageKey, String(heightRef.current))
+    }
+    window.addEventListener("mousemove", onMouseMove)
+    window.addEventListener("mouseup", onMouseUp)
+  }, [storageKey])
+
+  return { height, handleMouseDown }
+}
+
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      title="Drag to resize"
+      className="h-2 shrink-0 cursor-row-resize flex items-center justify-center group/resize"
+    >
+      <div className="w-10 h-1 rounded-full bg-border group-hover/resize:bg-primary/50 transition-colors" />
+    </div>
+  )
+}
+
+// ── list card ─────────────────────────────────────────────────────────────────
+
+function ListCard({
+  list,
+  tasks,
+  projects,
+  subprojectsByProject,
+  onAddTask,
+  onComplete,
+  onUncomplete,
+  onDelete,
+  onUpdate,
+  onEditList,
+  onDeleteList,
+}: {
+  list: TodoList
+  tasks: TodoTask[]
+  projects: Project[]
+  subprojectsByProject: Map<number, Subproject[]>
+  onAddTask: (listId: number, text: string) => void
+  onComplete: (id: number) => void
+  onUncomplete: (id: number) => void
+  onDelete: (id: number) => void
+  onUpdate: (id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null }) => void
+  onEditList: (list: TodoList) => void
+  onDeleteList: (id: number) => void
+}) {
+  const [newText, setNewText] = React.useState("")
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const { height, handleMouseDown } = useResizableHeight(`todo-list-height-${list.id}`)
+  const pct = completionRate(tasks, list.resetDaily)
+  const doneTasks = tasks.filter(t => isTaskComplete(t, list.resetDaily))
+  const activeTasks = tasks.filter(t => !isTaskComplete(t, list.resetDaily))
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newText.trim()) return
+    onAddTask(list.id, newText.trim())
+    setNewText("")
+    inputRef.current?.focus()
+  }
+
+  return (
+    <div className="bg-card border rounded-2xl shadow-sm overflow-hidden flex flex-col">
+      {/* header */}
+      <div className="px-4 py-3 border-b flex items-center gap-2.5 group/hdr" style={{ borderLeftColor: list.color, borderLeftWidth: 4 }}>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-xs shrink-0"
+          style={{ backgroundColor: list.color }}>
+          {list.letter}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-sm truncate leading-tight">{list.name}</div>
+          <div className="text-xs text-muted-foreground leading-tight">
+            {doneTasks.length}/{tasks.length}
+            {list.resetDaily && " · daily"}
+          </div>
+        </div>
+        <ProgressRing pct={pct} color={list.color} size={28} />
+        <span className="font-mono text-xs font-bold w-8 text-right shrink-0" style={{ color: list.color }}>{pct}%</span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0">
+          <button onClick={() => onEditList(list)}
+            className="p-1 rounded hover:bg-muted transition-colors" title="Edit list">
+            <Pencil className="h-3 w-3 text-muted-foreground" />
+          </button>
+          <button onClick={() => onDeleteList(list.id)}
+            className="p-1 rounded hover:bg-destructive/10 transition-colors" title="Delete list">
+            <Trash2 className="h-3 w-3 text-muted-foreground" />
+          </button>
+        </div>
+      </div>
+
+      {/* add task */}
+      <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-2 border-b bg-muted/20">
+        <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <input
+          ref={inputRef}
+          value={newText}
+          onChange={e => setNewText(e.target.value)}
+          placeholder="Add a task…"
+          className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/40 min-w-0"
+        />
+        {newText.trim() && (
+          <button type="submit"
+            className="text-xs font-bold px-2 py-0.5 rounded-md text-white shrink-0"
+            style={{ backgroundColor: list.color }}>
+            Add
+          </button>
+        )}
+      </form>
+
+      {/* task list */}
+      <div className="overflow-y-auto p-3 space-y-1.5" style={{ height }}>
+        {tasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/30 gap-2">
+            <ListChecks className="h-7 w-7" />
+            <p className="text-xs">No tasks yet</p>
+          </div>
+        ) : (
+          <>
+            {activeTasks.map(task => (
+              <TaskItem key={task.id} task={task} resetDaily={list.resetDaily}
+                projects={projects} subprojectsByProject={subprojectsByProject}
+                onComplete={onComplete} onUncomplete={onUncomplete}
+                onDelete={onDelete} onUpdate={onUpdate} />
+            ))}
+            {doneTasks.length > 0 && (
+              <>
+                <div className="flex items-center gap-2 py-1">
+                  <div className="flex-1 h-px bg-border" />
+                  <span className="text-xs text-muted-foreground">Done</span>
+                  <div className="flex-1 h-px bg-border" />
+                </div>
+                {doneTasks.map(task => (
+                  <TaskItem key={task.id} task={task} resetDaily={list.resetDaily}
+                    projects={projects} subprojectsByProject={subprojectsByProject}
+                    onComplete={onComplete} onUncomplete={onUncomplete}
+                    onDelete={onDelete} onUpdate={onUpdate} />
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      <ResizeHandle onMouseDown={handleMouseDown} />
+    </div>
   )
 }
 
@@ -220,7 +417,9 @@ export default function Todos() {
   const { toast } = useToast()
 
   const { data: lists = [], isLoading: listsLoading } = useListTodoLists()
-  const { data: allTasks = [], isLoading: tasksLoading } = useListTodoTasks()
+  const { data: allTasks = [] } = useListTodoTasks()
+  const { data: projects = [] } = useListProjects()
+  const { data: allSubprojects = [] } = useListSubprojects()
 
   const createList = useCreateTodoList()
   const updateList = useUpdateTodoList()
@@ -231,27 +430,15 @@ export default function Todos() {
   const completeTask = useCompleteTodoTask()
   const uncompleteTask = useUncompleteTodoTask()
 
-  const [activeListId, setActiveListId] = React.useState<number | null>(null)
-  const [newTaskText, setNewTaskText] = React.useState("")
   const [addingList, setAddingList] = React.useState(false)
   const [editingList, setEditingList] = React.useState<TodoList | null>(null)
   const [deleteListId, setDeleteListId] = React.useState<number | null>(null)
-  const inputRef = React.useRef<HTMLInputElement>(null)
-
-  // Set first list active once loaded
-  React.useEffect(() => {
-    if (lists.length > 0 && activeListId === null) {
-      setActiveListId(lists[0].id)
-    }
-  }, [lists, activeListId])
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: getListTodoListsQueryKey() })
     queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
   }
 
-  const activeList = lists.find(l => l.id === activeListId) ?? null
-  const activeTasks = allTasks.filter(t => t.listId === activeListId)
   const tasksByList = React.useMemo(() => {
     const map = new Map<number, TodoTask[]>()
     for (const t of allTasks) {
@@ -261,13 +448,14 @@ export default function Todos() {
     return map
   }, [allTasks])
 
-  // Sort: active tasks first (by creation), then completed at bottom
-  const sortedTasks = React.useMemo(() => {
-    if (!activeList) return []
-    const active = activeTasks.filter(t => !isTaskComplete(t, activeList.resetDaily))
-    const done = activeTasks.filter(t => isTaskComplete(t, activeList.resetDaily))
-    return [...active, ...done]
-  }, [activeTasks, activeList])
+  const subprojectsByProject = React.useMemo(() => {
+    const map = new Map<number, Subproject[]>()
+    for (const s of allSubprojects) {
+      if (!map.has(s.projectId)) map.set(s.projectId, [])
+      map.get(s.projectId)!.push(s)
+    }
+    return map
+  }, [allSubprojects])
 
   // ── list form ──
   const listForm = useForm<ListFormValues>({
@@ -287,7 +475,6 @@ export default function Todos() {
     setAddingList(true)
   }
 
-  // Auto-set letter from name
   const watchedName = listForm.watch("name")
   React.useEffect(() => {
     if (watchedName && !editingList) {
@@ -302,12 +489,7 @@ export default function Todos() {
       })
     } else {
       createList.mutate({ data: { ...values, sortOrder: lists.length } }, {
-        onSuccess: (data) => {
-          invalidate()
-          setAddingList(false)
-          setActiveListId(data.id)
-          toast({ title: "List created" })
-        },
+        onSuccess: () => { invalidate(); setAddingList(false); toast({ title: "List created" }) },
       })
     }
   }
@@ -315,21 +497,14 @@ export default function Todos() {
   function handleDeleteList() {
     if (!deleteListId) return
     deleteList.mutate({ id: deleteListId }, {
-      onSuccess: () => {
-        invalidate()
-        setDeleteListId(null)
-        if (activeListId === deleteListId) setActiveListId(lists.find(l => l.id !== deleteListId)?.id ?? null)
-        toast({ title: "List deleted" })
-      },
+      onSuccess: () => { invalidate(); setDeleteListId(null); toast({ title: "List deleted" }) },
     })
   }
 
-  // ── tasks ──
-  function handleAddTask(e: React.FormEvent) {
-    e.preventDefault()
-    if (!newTaskText.trim() || !activeListId) return
-    createTask.mutate({ data: { listId: activeListId, text: newTaskText.trim() } }, {
-      onSuccess: () => { invalidate(); setNewTaskText(""); inputRef.current?.focus() },
+  // ── task handlers ──
+  function handleAddTask(listId: number, text: string) {
+    createTask.mutate({ data: { listId, text } }, {
+      onSuccess: () => invalidate(),
     })
   }
 
@@ -345,164 +520,55 @@ export default function Todos() {
     deleteTask.mutate({ id }, { onSuccess: () => invalidate() })
   }
 
-  function handleEditTask(task: TodoTask) {
-    updateTask.mutate({ id: task.id, data: { text: task.text } }, {
-      onSuccess: () => invalidate(),
-    })
+  function handleUpdateTask(id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null }) {
+    updateTask.mutate({ id, data }, { onSuccess: () => invalidate() })
   }
-
-  const pct = activeList ? completionRate(activeTasks, activeList.resetDaily) : 0
-  const doneCount = activeList ? activeTasks.filter(t => isTaskComplete(t, activeList.resetDaily)).length : 0
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-8 max-w-3xl mx-auto w-full">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">To Do</h1>
-          <p className="text-muted-foreground">Organize your tasks across lists.</p>
-        </div>
-
-        {/* ── List tabs ── */}
-        <div className="flex items-center gap-3 flex-wrap">
-          {listsLoading ? (
-            <div className="text-sm text-muted-foreground">Loading lists...</div>
-          ) : (
-            lists.map(list => (
-              <div key={list.id} className="relative group/tab">
-                <ListTab
-                  list={list}
-                  tasks={tasksByList.get(list.id) ?? []}
-                  isActive={activeListId === list.id}
-                  onClick={() => setActiveListId(list.id)}
-                />
-                {activeListId === list.id && (
-                  <div className="absolute -top-2 -right-2 flex gap-0.5 opacity-0 group-hover/tab:opacity-100 transition-opacity">
-                    <button
-                      onClick={() => openEditList(list)}
-                      className="w-5 h-5 bg-background border rounded-full flex items-center justify-center shadow-sm hover:bg-muted"
-                    >
-                      <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteListId(list.id)}
-                      className="w-5 h-5 bg-background border rounded-full flex items-center justify-center shadow-sm hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
-
-          <button
-            onClick={openAddList}
-            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            New List
-          </button>
-        </div>
-
-        {/* ── Active list panel ── */}
-        {activeList && (
-          <div className="bg-card border rounded-2xl shadow-sm overflow-hidden">
-            {/* header bar */}
-            <div className="px-5 py-4 border-b flex items-center gap-3" style={{ borderLeftColor: activeList.color, borderLeftWidth: 4 }}>
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-white text-sm shrink-0"
-                style={{ backgroundColor: activeList.color }}>
-                {activeList.letter}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold">{activeList.name}</div>
-                <div className="text-xs text-muted-foreground">
-                  {doneCount} of {activeTasks.length} complete
-                  {activeList.resetDaily && " · resets daily"}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <ProgressRing pct={pct} color={activeList.color} size={36} />
-                <span className="font-mono font-bold text-sm" style={{ color: activeList.color }}>{pct}%</span>
-              </div>
-            </div>
-
-            {/* add task input */}
-            <form onSubmit={handleAddTask} className="flex items-center gap-3 px-5 py-3 border-b bg-muted/20">
-              <Plus className="h-4 w-4 text-muted-foreground shrink-0" />
-              <Input
-                ref={inputRef}
-                value={newTaskText}
-                onChange={e => setNewTaskText(e.target.value)}
-                placeholder="Add a task…"
-                className="border-none shadow-none bg-transparent focus-visible:ring-0 px-0 text-sm"
-                disabled={createTask.isPending}
-              />
-              {newTaskText.trim() && (
-                <Button type="submit" size="sm" disabled={createTask.isPending} style={{ backgroundColor: activeList.color }} className="text-white h-7 px-3">
-                  Add
-                </Button>
-              )}
-            </form>
-
-            {/* tasks */}
-            <div className="p-4 space-y-2 min-h-[200px]">
-              {tasksLoading ? (
-                <div className="text-center text-muted-foreground text-sm py-8">Loading...</div>
-              ) : sortedTasks.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-3 text-muted-foreground">
-                  <ListChecks className="h-10 w-10 opacity-20" />
-                  <p className="text-sm">No tasks yet. Add one above!</p>
-                </div>
-              ) : (
-                <>
-                  {/* active tasks */}
-                  {sortedTasks.filter(t => !isTaskComplete(t, activeList.resetDaily)).map(task => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      resetDaily={activeList.resetDaily}
-                      onComplete={handleComplete}
-                      onUncomplete={handleUncomplete}
-                      onDelete={handleDeleteTask}
-                      onEdit={handleEditTask}
-                    />
-                  ))}
-
-                  {/* completed divider */}
-                  {sortedTasks.some(t => isTaskComplete(t, activeList.resetDaily)) && (
-                    <div className="flex items-center gap-2 py-2">
-                      <div className="flex-1 h-px bg-border" />
-                      <span className="text-xs text-muted-foreground font-medium">Completed</span>
-                      <div className="flex-1 h-px bg-border" />
-                    </div>
-                  )}
-
-                  {/* completed tasks */}
-                  {sortedTasks.filter(t => isTaskComplete(t, activeList.resetDaily)).map(task => (
-                    <TaskItem
-                      key={task.id}
-                      task={task}
-                      resetDaily={activeList.resetDaily}
-                      onComplete={handleComplete}
-                      onUncomplete={handleUncomplete}
-                      onDelete={handleDeleteTask}
-                      onEdit={handleEditTask}
-                    />
-                  ))}
-                </>
-              )}
-            </div>
+      <div className="flex flex-col gap-6 p-6 md:p-8 w-full max-w-[1600px] mx-auto">
+        {/* header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">To Do</h1>
+            <p className="text-muted-foreground">All your lists at a glance.</p>
           </div>
-        )}
+          <Button onClick={openAddList} className="gap-2">
+            <Plus className="h-4 w-4" />
+            New List
+          </Button>
+        </div>
 
-        {!activeList && !listsLoading && (
-          <div className="border border-dashed rounded-2xl py-20 flex flex-col items-center gap-4 text-muted-foreground">
+        {/* grid of list cards */}
+        {listsLoading ? (
+          <div className="text-center text-muted-foreground py-12">Loading lists...</div>
+        ) : lists.length === 0 ? (
+          <div className="border border-dashed rounded-2xl py-24 flex flex-col items-center gap-4 text-muted-foreground">
             <ListChecks className="h-12 w-12 opacity-20" />
             <div className="text-center">
               <p className="font-semibold text-foreground">No lists yet</p>
               <p className="text-sm">Create a list to get started.</p>
             </div>
             <Button variant="outline" onClick={openAddList}>Create a list</Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 items-start">
+            {lists.map(list => (
+              <ListCard
+                key={list.id}
+                list={list}
+                tasks={tasksByList.get(list.id) ?? []}
+                projects={projects}
+                subprojectsByProject={subprojectsByProject}
+                onAddTask={handleAddTask}
+                onComplete={handleComplete}
+                onUncomplete={handleUncomplete}
+                onDelete={handleDeleteTask}
+                onUpdate={handleUpdateTask}
+                onEditList={openEditList}
+                onDeleteList={setDeleteListId}
+              />
+            ))}
           </div>
         )}
       </div>

@@ -1,14 +1,17 @@
-import { pgTable, text, serial, timestamp } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const projectsTable = pgTable("projects", {
-  id: serial("id").primaryKey(),
+export const projectsTable = sqliteTable("projects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
   color: text("color").notNull().default("#3B82F6"),
   status: text("status").notNull().default("active"), // 'active' | 'completed'
-  completedAt: timestamp("completed_at", { withTimezone: true }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
 });
 
 export const insertProjectSchema = createInsertSchema(projectsTable).omit({ id: true, createdAt: true });

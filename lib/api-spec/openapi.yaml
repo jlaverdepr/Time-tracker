@@ -18,6 +18,8 @@ tags:
     description: Work session operations
   - name: todos
     description: To-do list operations
+  - name: gym
+    description: Gym tracking operations
 paths:
   /healthz:
     get:
@@ -560,6 +562,11 @@ paths:
           schema:
             type: integer
           description: "Filter by list"
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by project"
       responses:
         "200":
           description: List of tasks
@@ -698,6 +705,413 @@ paths:
                 $ref: "#/components/schemas/TodoTask"
         "404":
           description: Not found
+
+  /gym-exercises:
+    get:
+      operationId: listGymExercises
+      tags: [gym]
+      summary: List all exercises
+      responses:
+        "200":
+          description: List of exercises
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymExercise"
+    post:
+      operationId: createGymExercise
+      tags: [gym]
+      summary: Create an exercise
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymExerciseInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymExercise"
+
+  /gym-exercises/{id}:
+    patch:
+      operationId: updateGymExercise
+      tags: [gym]
+      summary: Update an exercise
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymExerciseUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymExercise"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteGymExercise
+      tags: [gym]
+      summary: Delete an exercise
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /gym-workouts:
+    get:
+      operationId: listGymWorkouts
+      tags: [gym]
+      summary: List all workouts
+      responses:
+        "200":
+          description: List of workouts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymWorkout"
+    post:
+      operationId: createGymWorkout
+      tags: [gym]
+      summary: Create a workout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymWorkoutInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymWorkout"
+
+  /gym-workouts/{id}:
+    patch:
+      operationId: updateGymWorkout
+      tags: [gym]
+      summary: Update a workout's title and/or date
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymWorkoutUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymWorkout"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteGymWorkout
+      tags: [gym]
+      summary: Delete a workout
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /gym-workout-entries:
+    get:
+      operationId: listGymWorkoutEntries
+      tags: [gym]
+      summary: List workout entries, optionally filtered by workout
+      parameters:
+        - name: workoutId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by workout"
+      responses:
+        "200":
+          description: List of workout entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymWorkoutEntry"
+    post:
+      operationId: createGymWorkoutEntry
+      tags: [gym]
+      summary: Add an exercise entry to a workout (seeds one empty main set)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymWorkoutEntryInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymWorkoutEntry"
+
+  /gym-workout-entries/{id}:
+    delete:
+      operationId: deleteGymWorkoutEntry
+      tags: [gym]
+      summary: Delete a workout entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /gym-workout-sets:
+    get:
+      operationId: listGymWorkoutSets
+      tags: [gym]
+      summary: List sets, optionally filtered by entry
+      parameters:
+        - name: entryId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by workout entry"
+      responses:
+        "200":
+          description: List of sets
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymWorkoutSet"
+    post:
+      operationId: createGymWorkoutSet
+      tags: [gym]
+      summary: Add a set (main or warmup) to an entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymWorkoutSetInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymWorkoutSet"
+
+  /gym-workout-sets/{id}:
+    patch:
+      operationId: updateGymWorkoutSet
+      tags: [gym]
+      summary: Update a set's reps, weight, or failure flag
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymWorkoutSetUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymWorkoutSet"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteGymWorkoutSet
+      tags: [gym]
+      summary: Delete a set
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /gym-runs:
+    get:
+      operationId: listGymRuns
+      tags: [gym]
+      summary: List all runs
+      responses:
+        "200":
+          description: List of runs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymRun"
+    post:
+      operationId: createGymRun
+      tags: [gym]
+      summary: Log a run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymRunInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymRun"
+
+  /gym-runs/{id}:
+    patch:
+      operationId: updateGymRun
+      tags: [gym]
+      summary: Update a run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymRunUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymRun"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteGymRun
+      tags: [gym]
+      summary: Delete a run
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /gym-workout-templates:
+    get:
+      operationId: listGymWorkoutTemplates
+      tags: [gym]
+      summary: List all workout templates
+      responses:
+        "200":
+          description: List of templates
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymWorkoutTemplate"
+    post:
+      operationId: createGymWorkoutTemplate
+      tags: [gym]
+      summary: Save a set of exercises as a reusable template
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymWorkoutTemplateInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymWorkoutTemplate"
+
+  /gym-workout-templates/{id}:
+    delete:
+      operationId: deleteGymWorkoutTemplate
+      tags: [gym]
+      summary: Delete a workout template
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
 
 components:
   schemas:
@@ -995,6 +1409,10 @@ components:
           type: integer
         listId:
           type: integer
+        projectId:
+          type: ["integer", "null"]
+        subprojectId:
+          type: ["integer", "null"]
         text:
           type: string
         completedAt:
@@ -1016,6 +1434,10 @@ components:
         text:
           type: string
           minLength: 1
+        projectId:
+          type: integer
+        subprojectId:
+          type: integer
 
     TodoTaskUpdate:
       type: object
@@ -1023,6 +1445,10 @@ components:
         text:
           type: string
           minLength: 1
+        projectId:
+          type: ["integer", "null"]
+        subprojectId:
+          type: ["integer", "null"]
 
     TodoCalendarSummaryItem:
       type: object
@@ -1046,3 +1472,209 @@ components:
         percentage:
           type: integer
           description: "0-100"
+
+    GymExerciseCategory:
+      type: string
+      enum: ["Upper Body", "Lower Body", "Full Body", "Core", "Minor"]
+
+    GymExercise:
+      type: object
+      required: [id, name, category, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          $ref: "#/components/schemas/GymExerciseCategory"
+        createdAt:
+          type: string
+
+    GymExerciseInput:
+      type: object
+      required: [name, category]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        category:
+          $ref: "#/components/schemas/GymExerciseCategory"
+
+    GymExerciseUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        category:
+          $ref: "#/components/schemas/GymExerciseCategory"
+
+    GymWorkout:
+      type: object
+      required: [id, date, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        title:
+          type: ["string", "null"]
+          description: "'Chest' | 'Legs' | 'Back' | free text from 'Other'"
+        createdAt:
+          type: string
+
+    GymWorkoutInput:
+      type: object
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD; defaults to today if omitted"
+        title:
+          type: string
+
+    GymWorkoutUpdate:
+      type: object
+      properties:
+        title:
+          type: ["string", "null"]
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+
+    GymWorkoutEntry:
+      type: object
+      required: [id, workoutId, exerciseId, sortOrder, createdAt]
+      properties:
+        id:
+          type: integer
+        workoutId:
+          type: integer
+        exerciseId:
+          type: integer
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+
+    GymWorkoutEntryInput:
+      type: object
+      required: [workoutId, exerciseId]
+      properties:
+        workoutId:
+          type: integer
+        exerciseId:
+          type: integer
+        sortOrder:
+          type: integer
+
+    GymWorkoutSet:
+      type: object
+      required: [id, entryId, isWarmup, setIndex, failure, createdAt]
+      properties:
+        id:
+          type: integer
+        entryId:
+          type: integer
+        isWarmup:
+          type: boolean
+        setIndex:
+          type: integer
+          description: "1-5, position within its group (main or warmup)"
+        reps:
+          type: ["integer", "null"]
+        weight:
+          type: ["number", "null"]
+        failure:
+          type: boolean
+        createdAt:
+          type: string
+
+    GymWorkoutSetInput:
+      type: object
+      required: [entryId, isWarmup, setIndex]
+      properties:
+        entryId:
+          type: integer
+        isWarmup:
+          type: boolean
+        setIndex:
+          type: integer
+        reps:
+          type: integer
+        weight:
+          type: number
+
+    GymWorkoutSetUpdate:
+      type: object
+      properties:
+        reps:
+          type: ["integer", "null"]
+        weight:
+          type: ["number", "null"]
+        failure:
+          type: boolean
+
+    GymRun:
+      type: object
+      required: [id, date, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        distanceKm:
+          type: ["number", "null"]
+        durationMinutes:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    GymRunInput:
+      type: object
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD; defaults to today if omitted"
+        distanceKm:
+          type: number
+        durationMinutes:
+          type: integer
+
+    GymRunUpdate:
+      type: object
+      properties:
+        date:
+          type: string
+        distanceKm:
+          type: ["number", "null"]
+        durationMinutes:
+          type: ["integer", "null"]
+
+    GymWorkoutTemplate:
+      type: object
+      required: [id, name, exerciseIds, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        exerciseIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+
+    GymWorkoutTemplateInput:
+      type: object
+      required: [name, exerciseIds]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        exerciseIds:
+          type: array
+          items:
+            type: integer

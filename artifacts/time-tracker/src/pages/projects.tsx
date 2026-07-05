@@ -6,8 +6,11 @@ import {
   useListSubprojects, useCreateSubproject, useUpdateSubproject,
   useDeleteSubproject, useCompleteSubproject, useReopenSubproject,
   getListSubprojectsQueryKey,
+  useListTodoLists, useListTodoTasks, useCreateTodoTask,
+  useCompleteTodoTask, useUncompleteTodoTask,
+  getListTodoTasksQueryKey,
 } from "@workspace/api-client-react"
-import type { Subproject } from "@workspace/api-client-react"
+import type { Subproject, TodoTask, TodoList } from "@workspace/api-client-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +20,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Trash2, Edit2, Plus, FolderGit2, CheckCircle2, RotateCcw,
-  ChevronDown, ChevronRight, GitBranch, Circle,
+  ChevronDown, ChevronRight, GitBranch, ListChecks,
 } from "lucide-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
@@ -46,25 +49,61 @@ const PRESET_COLORS = [
   "#71717a", "#78716c",
 ]
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function ProgressRing({ pct, color, size = 32 }: { pct: number; color: string; size?: number }) {
+  const r = (size - 4) / 2
+  const circ = 2 * Math.PI * r
+  const dash = (pct / 100) * circ
+  return (
+    <svg width={size} height={size} className="-rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={3} className="text-muted/30" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={3}
+        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round" />
+    </svg>
+  )
+}
+
+const TODAY = format(new Date(), "yyyy-MM-dd")
+
+function isTaskDone(task: TodoTask, resetDaily: boolean): boolean {
+  if (!task.completedAt) return false
+  if (resetDaily) return task.completedDate === TODAY
+  return true
+}
+
+function taskCompletionRate(tasks: TodoTask[], listById: Map<number, TodoList>): number | null {
+  if (tasks.length === 0) return null
+  const done = tasks.filter(t => isTaskDone(t, listById.get(t.listId)?.resetDaily ?? false)).length
+  return Math.round((done / tasks.length) * 100)
+}
+
 // ── subproject row ─────────────────────────────────────────────────────────
 
 function SubprojectRow({
   sub,
   projectColor,
+  tasksDone,
+  tasksTotal,
   onEdit,
   onDelete,
   onComplete,
   onReopen,
+  onAddTask,
 }: {
   sub: Subproject
   projectColor: string
+  tasksDone: number
+  tasksTotal: number
   onEdit: (sub: Subproject) => void
   onDelete: (id: number) => void
   onComplete: (id: number) => void
   onReopen: (id: number) => void
+  onAddTask: (subprojectId: number) => void
 }) {
   const color = sub.color ?? projectColor
   const done = sub.status === "completed"
+  const rate = tasksTotal > 0 ? Math.round((tasksDone / tasksTotal) * 100) : null
 
   return (
     <div className={cn(
@@ -82,27 +121,82 @@ function SubprojectRow({
           </span>
         )}
       </div>
+
+      {/* task completion badge */}
+      {rate !== null && (
+        <div className="flex items-center gap-1 shrink-0">
+          <ProgressRing pct={rate} color={color} size={20} />
+          <span className="text-xs tabular-nums font-medium" style={{ color }}>{rate}%</span>
+          <span className="text-xs text-muted-foreground">({tasksDone}/{tasksTotal})</span>
+        </div>
+      )}
+
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
         {!done ? (
           <>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
               title="Mark complete" onClick={() => onComplete(sub.id)}>
-              <CheckCircle2 className="h-3.5 w-3.5" />
+              <CheckCircle2 className="h-3 w-3" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" title="Edit" onClick={() => onEdit(sub)}>
-              <Edit2 className="h-3.5 w-3.5 text-muted-foreground" />
+            <Button variant="ghost" size="icon" className="h-6 w-6" title="Edit" onClick={() => onEdit(sub)}>
+              <Edit2 className="h-3 w-3 text-muted-foreground" />
             </Button>
           </>
         ) : (
-          <Button variant="ghost" size="icon" className="h-7 w-7" title="Reopen" onClick={() => onReopen(sub.id)}>
-            <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+          <Button variant="ghost" size="icon" className="h-6 w-6" title="Reopen" onClick={() => onReopen(sub.id)}>
+            <RotateCcw className="h-3 w-3 text-muted-foreground" />
           </Button>
         )}
-        <Button variant="ghost" size="icon" className="h-7 w-7 hover:bg-destructive/10 hover:text-destructive"
+        <Button variant="ghost" size="icon" className="h-6 w-6" title="Add task"
+          onClick={() => onAddTask(sub.id)}>
+          <Plus className="h-3 w-3 text-muted-foreground" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-6 w-6 hover:bg-destructive/10 hover:text-destructive"
           title="Delete" onClick={() => onDelete(sub.id)}>
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-3 w-3" />
         </Button>
       </div>
+    </div>
+  )
+}
+
+// ── todo task row (inside project card) ──────────────────────────────────────
+
+function ProjectTaskRow({
+  task,
+  listName,
+  listColor,
+  resetDaily,
+  onComplete,
+  onUncomplete,
+}: {
+  task: TodoTask
+  listName: string
+  listColor: string
+  resetDaily: boolean
+  onComplete: (id: number) => void
+  onUncomplete: (id: number) => void
+}) {
+  const done = isTaskDone(task, resetDaily)
+  return (
+    <div className={cn(
+      "flex items-center gap-2.5 px-3 py-2 rounded-lg group transition-colors",
+      done ? "opacity-50" : "hover:bg-muted/30"
+    )}>
+      <button onClick={() => done ? onUncomplete(task.id) : onComplete(task.id)}
+        className="shrink-0 hover:scale-110 transition-transform">
+        {done
+          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          : <div className="h-3.5 w-3.5 rounded-full border-2 border-muted-foreground/30 hover:border-primary/60" />
+        }
+      </button>
+      <span className={cn("flex-1 text-xs truncate", done && "line-through text-muted-foreground")}>
+        {task.text}
+      </span>
+      <span className="text-xs px-1.5 py-0.5 rounded shrink-0 font-medium"
+        style={{ backgroundColor: listColor + "22", color: listColor }}>
+        {listName}
+      </span>
     </div>
   )
 }
@@ -112,6 +206,9 @@ function SubprojectRow({
 export default function Projects() {
   const { data: projects, isLoading } = useListProjects()
   const { data: allSubprojects } = useListSubprojects()
+  const { data: allTasks = [] } = useListTodoTasks()
+  const { data: lists = [] } = useListTodoLists()
+
   const createProject = useCreateProject()
   const updateProject = useUpdateProject()
   const deleteProject = useDeleteProject()
@@ -122,23 +219,32 @@ export default function Projects() {
   const deleteSubproject = useDeleteSubproject()
   const completeSubproject = useCompleteSubproject()
   const reopenSubproject = useReopenSubproject()
+  const createTask = useCreateTodoTask()
+  const completeTask = useCompleteTodoTask()
+  const uncompleteTask = useUncompleteTodoTask()
 
   const queryClient = useQueryClient()
   const { toast } = useToast()
 
-  // ── project dialog ──
+  // ── dialog state ──
   const [isProjectDialogOpen, setIsProjectDialogOpen] = React.useState(false)
   const [editingProjectId, setEditingProjectId] = React.useState<number | null>(null)
   const [deleteProjectId, setDeleteProjectId] = React.useState<number | null>(null)
 
-  // ── subproject dialog ──
   const [isSubprojectDialogOpen, setIsSubprojectDialogOpen] = React.useState(false)
   const [subprojectParentId, setSubprojectParentId] = React.useState<number | null>(null)
   const [editingSubprojectId, setEditingSubprojectId] = React.useState<number | null>(null)
   const [deleteSubprojectId, setDeleteSubprojectId] = React.useState<number | null>(null)
 
-  // ── expanded cards ──
+  // ── add-task-to-project dialog ──
+  const [addTaskTarget, setAddTaskTarget] = React.useState<{ projectId: number; subprojectId?: number } | null>(null)
+  const [addTaskListId, setAddTaskListId] = React.useState<number | null>(null)
+  const [addTaskSubId, setAddTaskSubId] = React.useState<number | null>(null)
+  const [addTaskText, setAddTaskText] = React.useState("")
+
+  // ── expanded state ──
   const [expandedProjects, setExpandedProjects] = React.useState<Set<number>>(new Set())
+  const [expandedTasksProjects, setExpandedTasksProjects] = React.useState<Set<number>>(new Set())
 
   const projectForm = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
@@ -150,7 +256,7 @@ export default function Projects() {
     defaultValues: { name: "" },
   })
 
-  // group subprojects by projectId
+  // ── derived data ──
   const subprojectsByProject = React.useMemo(() => {
     const map = new Map<number, Subproject[]>()
     for (const sub of allSubprojects ?? []) {
@@ -160,17 +266,42 @@ export default function Projects() {
     return map
   }, [allSubprojects])
 
-  function toggleExpand(id: number) {
-    setExpandedProjects(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
+  const tasksByProject = React.useMemo(() => {
+    const map = new Map<number, TodoTask[]>()
+    for (const t of allTasks) {
+      if (t.projectId != null) {
+        if (!map.has(t.projectId)) map.set(t.projectId, [])
+        map.get(t.projectId)!.push(t)
+      }
+    }
+    return map
+  }, [allTasks])
+
+  const tasksBySubproject = React.useMemo(() => {
+    const map = new Map<number, TodoTask[]>()
+    for (const t of allTasks) {
+      if (t.subprojectId != null) {
+        if (!map.has(t.subprojectId)) map.set(t.subprojectId, [])
+        map.get(t.subprojectId)!.push(t)
+      }
+    }
+    return map
+  }, [allTasks])
+
+  const listById = React.useMemo(() => new Map(lists.map(l => [l.id, l])), [lists])
 
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() })
     queryClient.invalidateQueries({ queryKey: getListSubprojectsQueryKey() })
+    queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
+  }
+
+  function toggleExpand(id: number) {
+    setExpandedProjects(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  }
+
+  function toggleTasksExpand(id: number) {
+    setExpandedTasksProjects(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
   // ── project CRUD ──
@@ -205,17 +336,11 @@ export default function Projects() {
     })
   }
 
-  const handleCompleteProject = (id: number) => {
-    completeProject.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Project completed" }); invalidateAll() },
-    })
-  }
+  const handleCompleteProject = (id: number) =>
+    completeProject.mutate({ id }, { onSuccess: () => { toast({ title: "Project completed" }); invalidateAll() } })
 
-  const handleReopenProject = (id: number) => {
-    reopenProject.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Project reopened" }); invalidateAll() },
-    })
-  }
+  const handleReopenProject = (id: number) =>
+    reopenProject.mutate({ id }, { onSuccess: () => { toast({ title: "Project reopened" }); invalidateAll() } })
 
   // ── subproject CRUD ──
   const openAddSubproject = (projectId: number) => {
@@ -252,17 +377,46 @@ export default function Projects() {
     })
   }
 
-  const handleCompleteSubproject = (id: number) => {
-    completeSubproject.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Subproject completed ✓" }); invalidateAll() },
+  const handleCompleteSubproject = (id: number) =>
+    completeSubproject.mutate({ id }, { onSuccess: () => { toast({ title: "Subproject completed ✓" }); invalidateAll() } })
+
+  const handleReopenSubproject = (id: number) =>
+    reopenSubproject.mutate({ id }, { onSuccess: () => { toast({ title: "Subproject reopened" }); invalidateAll() } })
+
+  // ── add task to project ──
+  function openAddTask(projectId: number, subprojectId?: number) {
+    setAddTaskTarget({ projectId, subprojectId })
+    setAddTaskListId(lists[0]?.id ?? null)
+    setAddTaskSubId(subprojectId ?? null)
+    setAddTaskText("")
+    setExpandedTasksProjects(prev => new Set([...prev, projectId]))
+  }
+
+  function handleAddTask() {
+    if (!addTaskTarget || !addTaskListId || !addTaskText.trim()) return
+    createTask.mutate({
+      data: {
+        listId: addTaskListId,
+        text: addTaskText.trim(),
+        projectId: addTaskTarget.projectId,
+        subprojectId: addTaskSubId ?? undefined,
+      }
+    }, {
+      onSuccess: () => { invalidateAll(); setAddTaskTarget(null); setAddTaskText(""); toast({ title: "Task added" }) },
     })
   }
 
-  const handleReopenSubproject = (id: number) => {
-    reopenSubproject.mutate({ id }, {
-      onSuccess: () => { toast({ title: "Subproject reopened" }); invalidateAll() },
-    })
+  function handleCompleteTask(id: number) {
+    completeTask.mutate({ id }, { onSuccess: () => invalidateAll() })
   }
+
+  function handleUncompleteTask(id: number) {
+    uncompleteTask.mutate({ id }, { onSuccess: () => invalidateAll() })
+  }
+
+  const addTaskSubs = addTaskTarget
+    ? (subprojectsByProject.get(addTaskTarget.projectId) ?? [])
+    : []
 
   return (
     <Layout>
@@ -296,11 +450,20 @@ export default function Projects() {
               const activeSubs = subs.filter(s => s.status === "active")
               const completedSubs = subs.filter(s => s.status === "completed")
               const isExpanded = expandedProjects.has(project.id)
+              const isTasksExpanded = expandedTasksProjects.has(project.id)
               const isDone = project.status === "completed"
+
+              // Completion rate: % subprojects done; fallback to task rate if no subs
+              const subRate = subs.length > 0
+                ? Math.round((completedSubs.length / subs.length) * 100)
+                : null
+              const projectTasks = tasksByProject.get(project.id) ?? []
+              const taskRate = taskCompletionRate(projectTasks, listById)
+              // Display rate: prefer sub-based if subs exist, else task-based
+              const displayRate = subRate ?? taskRate
 
               return (
                 <Card key={project.id} className={cn("overflow-hidden flex flex-col group", isDone && "opacity-70")}>
-                  {/* color bar */}
                   <div className="h-1.5 w-full" style={{ backgroundColor: project.color }} />
 
                   <CardHeader className="pb-3">
@@ -310,11 +473,20 @@ export default function Projects() {
                           {project.name}
                         </CardTitle>
                         {isDone && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium shrink-0">
-                            Done
-                          </span>
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-medium shrink-0">Done</span>
                         )}
                       </div>
+
+                      {/* completion rate */}
+                      {displayRate !== null && (
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <ProgressRing pct={displayRate} color={project.color} size={28} />
+                          <span className="text-xs font-bold tabular-nums" style={{ color: project.color }}>
+                            {displayRate}%
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                         {!isDone ? (
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
@@ -339,7 +511,7 @@ export default function Projects() {
                       </div>
                     </div>
 
-                    {/* subproject summary badge */}
+                    {/* subproject summary */}
                     {subs.length > 0 && (
                       <button
                         onClick={() => toggleExpand(project.id)}
@@ -355,24 +527,31 @@ export default function Projects() {
                     )}
                   </CardHeader>
 
-                  {/* subprojects section */}
-                  <CardContent className="pt-0 pb-3">
+                  <CardContent className="pt-0 pb-3 flex flex-col gap-1">
+                    {/* subprojects section */}
                     {(isExpanded || subs.length === 0) && (
                       <div className="space-y-0.5">
-                        {isExpanded && subs.map(sub => (
-                          <SubprojectRow
-                            key={sub.id}
-                            sub={sub}
-                            projectColor={project.color}
-                            onEdit={openEditSubproject}
-                            onDelete={setDeleteSubprojectId}
-                            onComplete={handleCompleteSubproject}
-                            onReopen={handleReopenSubproject}
-                          />
-                        ))}
+                        {isExpanded && subs.map(sub => {
+                          const subTasks = tasksBySubproject.get(sub.id) ?? []
+                          const subDone = subTasks.filter(t => isTaskDone(t, listById.get(t.listId)?.resetDaily ?? false)).length
+                          return (
+                            <SubprojectRow
+                              key={sub.id}
+                              sub={sub}
+                              projectColor={project.color}
+                              tasksDone={subDone}
+                              tasksTotal={subTasks.length}
+                              onEdit={openEditSubproject}
+                              onDelete={setDeleteSubprojectId}
+                              onComplete={handleCompleteSubproject}
+                              onReopen={handleReopenSubproject}
+                              onAddTask={(subId) => openAddTask(project.id, subId)}
+                            />
+                          )
+                        })}
                         <button
                           onClick={() => openAddSubproject(project.id)}
-                          className="flex items-center gap-2 px-4 py-2 w-full text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/40 mt-1"
+                          className="flex items-center gap-2 px-4 py-1.5 w-full text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/40"
                         >
                           <Plus className="h-3 w-3" />
                           Add subproject
@@ -383,12 +562,65 @@ export default function Projects() {
                     {!isExpanded && subs.length > 0 && (
                       <button
                         onClick={() => openAddSubproject(project.id)}
-                        className="flex items-center gap-2 px-4 py-2 w-full text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/40"
+                        className="flex items-center gap-2 px-4 py-1.5 w-full text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/40"
                       >
                         <Plus className="h-3 w-3" />
                         Add subproject
                       </button>
                     )}
+
+                    {/* ── todo tasks section ── */}
+                    <div className="border-t mt-1 pt-1">
+                      <button
+                        onClick={() => toggleTasksExpand(project.id)}
+                        className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/40"
+                      >
+                        {isTasksExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                        <ListChecks className="h-3 w-3" />
+                        <span>
+                          Tasks
+                          {projectTasks.length > 0 && (
+                            <span className="ml-1 text-muted-foreground">
+                              · {projectTasks.filter(t => isTaskDone(t, listById.get(t.listId)?.resetDaily ?? false)).length}/{projectTasks.length}
+                              {taskRate !== null && ` (${taskRate}%)`}
+                            </span>
+                          )}
+                        </span>
+                        <span className="ml-auto">
+                          <Plus className="h-3 w-3" onClick={e => { e.stopPropagation(); openAddTask(project.id) }} />
+                        </span>
+                      </button>
+
+                      {isTasksExpanded && (
+                        <div className="mt-1 space-y-0.5">
+                          {projectTasks.length === 0 ? (
+                            <p className="text-xs text-muted-foreground/50 px-4 py-2">No tasks linked to this project.</p>
+                          ) : (
+                            projectTasks.map(task => {
+                              const list = listById.get(task.listId)
+                              return (
+                                <ProjectTaskRow
+                                  key={task.id}
+                                  task={task}
+                                  listName={list?.name ?? "?"}
+                                  listColor={list?.color ?? "#64748b"}
+                                  resetDaily={list?.resetDaily ?? false}
+                                  onComplete={handleCompleteTask}
+                                  onUncomplete={handleUncompleteTask}
+                                />
+                              )
+                            })
+                          )}
+                          <button
+                            onClick={() => openAddTask(project.id)}
+                            className="flex items-center gap-2 px-3 py-1.5 w-full text-xs text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-muted/40"
+                          >
+                            <Plus className="h-3 w-3" />
+                            Add task to this project
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               )
@@ -478,6 +710,65 @@ export default function Projects() {
         </DialogContent>
       </Dialog>
 
+      {/* ── Add task to project dialog ── */}
+      <Dialog open={!!addTaskTarget} onOpenChange={o => !o && setAddTaskTarget(null)}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Add Task to Project</DialogTitle>
+            <DialogDescription>
+              The task will be added to a To Do list and linked to this project.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Task</label>
+              <Input
+                autoFocus
+                placeholder="Describe the task…"
+                value={addTaskText}
+                onChange={e => setAddTaskText(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleAddTask() }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Add to list</label>
+              <select
+                value={addTaskListId ?? ""}
+                onChange={e => setAddTaskListId(Number(e.target.value))}
+                className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              >
+                {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+            </div>
+
+            {addTaskSubs.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Subproject (optional)</label>
+                <select
+                  value={addTaskSubId ?? ""}
+                  onChange={e => setAddTaskSubId(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full h-9 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">None</option>
+                  {addTaskSubs.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="ghost" onClick={() => setAddTaskTarget(null)}>Cancel</Button>
+              <Button
+                disabled={!addTaskText.trim() || !addTaskListId || createTask.isPending}
+                onClick={handleAddTask}
+              >
+                Add Task
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* ── Delete project confirm ── */}
       <AlertDialog open={!!deleteProjectId} onOpenChange={open => !open && setDeleteProjectId(null)}>
         <AlertDialogContent>
@@ -501,7 +792,7 @@ export default function Projects() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete subproject?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this subproject. Sessions linked to it will remain but lose the subproject association.
+              Sessions linked to it will remain but lose the subproject association.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -9,6 +9,10 @@
 export interface TodoTask {
   id: number;
   listId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
   text: string;
   /** @nullable */
   completedAt?: string | null;

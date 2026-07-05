@@ -1,16 +1,20 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import pg from "pg";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from "better-sqlite3";
+import { mkdirSync } from "node:fs";
+import path from "node:path";
 import * as schema from "./schema";
 
-const { Pool } = pg;
-
-if (!process.env.DATABASE_URL) {
+if (!process.env.DB_PATH) {
   throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
+    "DB_PATH must be set to the path of the local SQLite database file.",
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-export const db = drizzle(pool, { schema });
+mkdirSync(path.dirname(process.env.DB_PATH), { recursive: true });
+
+export const sqlite: Database.Database = new Database(process.env.DB_PATH);
+sqlite.pragma("foreign_keys = ON");
+
+export const db = drizzle(sqlite, { schema });
 
 export * from "./schema";

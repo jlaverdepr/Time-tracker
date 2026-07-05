@@ -209,6 +209,10 @@ export interface TodoListUpdate {
 export interface TodoTask {
   id: number;
   listId: number;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
   text: string;
   /** @nullable */
   completedAt?: string | null;
@@ -225,11 +229,17 @@ export interface TodoTaskInput {
   listId: number;
   /** @minLength 1 */
   text: string;
+  projectId?: number;
+  subprojectId?: number;
 }
 
 export interface TodoTaskUpdate {
   /** @minLength 1 */
   text?: string;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
 }
 
 export interface TodoCalendarSummaryItem {
@@ -243,6 +253,144 @@ export interface TodoCalendarSummaryItem {
   completedTasks: number;
   /** 0-100 */
   percentage: number;
+}
+
+export type GymExerciseCategory = typeof GymExerciseCategory[keyof typeof GymExerciseCategory];
+
+
+export const GymExerciseCategory = {
+  Upper_Body: 'Upper Body',
+  Lower_Body: 'Lower Body',
+  Full_Body: 'Full Body',
+  Core: 'Core',
+  Minor: 'Minor',
+} as const;
+
+export interface GymExercise {
+  id: number;
+  name: string;
+  category: GymExerciseCategory;
+  createdAt: string;
+}
+
+export interface GymExerciseInput {
+  /** @minLength 1 */
+  name: string;
+  category: GymExerciseCategory;
+}
+
+export interface GymExerciseUpdate {
+  /** @minLength 1 */
+  name?: string;
+  category?: GymExerciseCategory;
+}
+
+export interface GymWorkout {
+  id: number;
+  /** YYYY-MM-DD */
+  date: string;
+  /**
+     * 'Chest' | 'Legs' | 'Back' | free text from 'Other'
+     * @nullable
+     */
+  title?: string | null;
+  createdAt: string;
+}
+
+export interface GymWorkoutInput {
+  /** YYYY-MM-DD; defaults to today if omitted */
+  date?: string;
+  title?: string;
+}
+
+export interface GymWorkoutUpdate {
+  /** @nullable */
+  title?: string | null;
+  /** YYYY-MM-DD */
+  date?: string;
+}
+
+export interface GymWorkoutEntry {
+  id: number;
+  workoutId: number;
+  exerciseId: number;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface GymWorkoutEntryInput {
+  workoutId: number;
+  exerciseId: number;
+  sortOrder?: number;
+}
+
+export interface GymWorkoutSet {
+  id: number;
+  entryId: number;
+  isWarmup: boolean;
+  /** 1-5, position within its group (main or warmup) */
+  setIndex: number;
+  /** @nullable */
+  reps?: number | null;
+  /** @nullable */
+  weight?: number | null;
+  failure: boolean;
+  createdAt: string;
+}
+
+export interface GymWorkoutSetInput {
+  entryId: number;
+  isWarmup: boolean;
+  setIndex: number;
+  reps?: number;
+  weight?: number;
+}
+
+export interface GymWorkoutSetUpdate {
+  /** @nullable */
+  reps?: number | null;
+  /** @nullable */
+  weight?: number | null;
+  failure?: boolean;
+}
+
+export interface GymRun {
+  id: number;
+  /** YYYY-MM-DD */
+  date: string;
+  /** @nullable */
+  distanceKm?: number | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+  createdAt: string;
+}
+
+export interface GymRunInput {
+  /** YYYY-MM-DD; defaults to today if omitted */
+  date?: string;
+  distanceKm?: number;
+  durationMinutes?: number;
+}
+
+export interface GymRunUpdate {
+  date?: string;
+  /** @nullable */
+  distanceKm?: number | null;
+  /** @nullable */
+  durationMinutes?: number | null;
+}
+
+export interface GymWorkoutTemplate {
+  id: number;
+  name: string;
+  exerciseIds: number[];
+  createdAt: string;
+}
+
+export interface GymWorkoutTemplateInput {
+  /** @minLength 1 */
+  name: string;
+  exerciseIds: number[];
 }
 
 export type ListSubprojectsParams = {
@@ -305,6 +453,10 @@ export type ListTodoTasksParams = {
  * Filter by list
  */
 listId?: number;
+/**
+ * Filter by project
+ */
+projectId?: number;
 };
 
 export type GetTodoCalendarSummaryParams = {
@@ -316,5 +468,19 @@ startDate: string;
  * YYYY-MM-DD
  */
 endDate: string;
+};
+
+export type ListGymWorkoutEntriesParams = {
+/**
+ * Filter by workout
+ */
+workoutId?: number;
+};
+
+export type ListGymWorkoutSetsParams = {
+/**
+ * Filter by workout entry
+ */
+entryId?: number;
 };
 

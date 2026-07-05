@@ -1,0 +1,48 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1783249785345,
+      "tag": "0000_lame_captain_marvel",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783253383507,
+      "tag": "0001_left_crusher_hogan",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783255260479,
+      "tag": "0002_rich_caretaker",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1783256653170,
+      "tag": "0003_tense_killmonger",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1783258405386,
+      "tag": "0004_outgoing_vulcan",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1783260930803,
+      "tag": "0005_brainy_mongu",
+      "breakpoints": true
+    }
+  ]
+}

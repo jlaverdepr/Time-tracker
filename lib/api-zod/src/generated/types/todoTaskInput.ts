@@ -10,4 +10,6 @@ export interface TodoTaskInput {
   listId: number;
   /** @minLength 1 */
   text: string;
+  projectId?: number;
+  subprojectId?: number;
 }

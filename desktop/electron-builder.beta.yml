@@ -1,0 +1,22 @@
+appId: com.focustime.desktop.beta
+productName: FocusTime Beta
+directories:
+  output: dist-beta
+afterPack: build/after-pack.cjs
+files:
+  - dist-main/**/*
+  - package.json
+asarUnpack:
+  - "**/*.node"
+extraResources:
+  - from: ../lib/db/drizzle
+    to: drizzle
+  - from: ../artifacts/time-tracker/dist/public
+    to: public
+mac:
+  icon: build/icon-beta.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.productivity

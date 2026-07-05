@@ -11,4 +11,8 @@ export type ListTodoTasksParams = {
  * Filter by list
  */
 listId?: number;
+/**
+ * Filter by project
+ */
+projectId?: number;
 };

@@ -1,19 +1,22 @@
-import { pgTable, text, serial, timestamp, integer, date } from "drizzle-orm/pg-core";
+import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { projectsTable } from "./projects";
 import { subprojectsTable } from "./subprojects";
 
-export const sessionsTable = pgTable("sessions", {
-  id: serial("id").primaryKey(),
+export const sessionsTable = sqliteTable("sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: integer("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   subprojectId: integer("subproject_id").references(() => subprojectsTable.id, { onDelete: "set null" }),
-  date: date("date", { mode: "string" }).notNull(),
+  date: text("date").notNull(),
   startTime: text("start_time"),
   endTime: text("end_time"),
   durationMinutes: integer("duration_minutes").notNull(),
   notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
 });
 
 export const insertSessionSchema = createInsertSchema(sessionsTable).omit({ id: true, createdAt: true });

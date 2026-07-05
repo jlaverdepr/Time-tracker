@@ -9,4 +9,8 @@
 export interface TodoTaskUpdate {
   /** @minLength 1 */
   text?: string;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
 }

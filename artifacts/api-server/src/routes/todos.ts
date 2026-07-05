@@ -35,6 +35,8 @@ function serializeTask(row: TodoTask) {
   return {
     id: row.id,
     listId: row.listId,
+    projectId: row.projectId ?? null,
+    subprojectId: row.subprojectId ?? null,
     text: row.text,
     completedAt: row.completedAt ? row.completedAt.toISOString() : null,
     completedDate: row.completedDate ?? null,
@@ -144,11 +146,17 @@ router.get("/todo-tasks/calendar-summary", async (req, res): Promise<void> => {
 router.get("/todo-tasks", async (req, res): Promise<void> => {
   const parsed = ListTodoTasksQueryParams.safeParse(req.query);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  const rows = parsed.data.listId
+
+  const conditions = [];
+  if (parsed.data.listId) conditions.push(eq(todoTasksTable.listId, parsed.data.listId));
+  if (parsed.data.projectId) conditions.push(eq(todoTasksTable.projectId, parsed.data.projectId));
+
+  const rows = conditions.length > 0
     ? await db.select().from(todoTasksTable)
-        .where(eq(todoTasksTable.listId, parsed.data.listId))
+        .where(conditions.length === 1 ? conditions[0] : and(...conditions))
         .orderBy(todoTasksTable.sortOrder, todoTasksTable.createdAt)
     : await db.select().from(todoTasksTable).orderBy(todoTasksTable.sortOrder, todoTasksTable.createdAt);
+
   res.json(ListTodoTasksResponse.parse(rows.map(serializeTask)));
 });
 
@@ -158,6 +166,8 @@ router.post("/todo-tasks", async (req, res): Promise<void> => {
   const [row] = await db.insert(todoTasksTable).values({
     listId: parsed.data.listId,
     text: parsed.data.text,
+    projectId: parsed.data.projectId ?? null,
+    subprojectId: parsed.data.subprojectId ?? null,
     sortOrder: 0,
   }).returning();
   res.status(201).json(CreateTodoTaskResponse.parse(serializeTask(row)));
@@ -168,8 +178,14 @@ router.patch("/todo-tasks/:id", async (req, res): Promise<void> => {
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = UpdateTodoTaskBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  if (!parsed.data.text) { res.status(400).json({ error: "Nothing to update" }); return; }
-  const [row] = await db.update(todoTasksTable).set({ text: parsed.data.text })
+
+  const updates: Partial<typeof todoTasksTable.$inferInsert> = {};
+  if (parsed.data.text !== undefined) updates.text = parsed.data.text;
+  if ("projectId" in parsed.data) updates.projectId = parsed.data.projectId ?? null;
+  if ("subprojectId" in parsed.data) updates.subprojectId = parsed.data.subprojectId ?? null;
+
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Nothing to update" }); return; }
+  const [row] = await db.update(todoTasksTable).set(updates)
     .where(eq(todoTasksTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Task not found" }); return; }
   res.json(UpdateTodoTaskResponse.parse(serializeTask(row)));

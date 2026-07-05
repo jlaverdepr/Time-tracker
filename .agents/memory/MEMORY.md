@@ -1,0 +1,3 @@
+- [FocusTime stack](focustime-stack.md) — monorepo, React+Vite frontend, Express 5 API, Drizzle+Postgres, OpenAPI-first codegen with orval v8.18
+- [Codegen workflow](codegen-workflow.md) — after any openapi.yaml change: run orval, then `pnpm run typecheck:libs` to rebuild .d.ts before typechecking packages
+- [Daily-reset todo logic](todo-daily-reset.md) — TODAY must be computed per-render (not module-level) so daily resets work past midnight; calendar summary uses completedDate per-day for both list types

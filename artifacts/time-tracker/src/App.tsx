@@ -4,6 +4,7 @@ import Dashboard from '@/pages/dashboard';
 import Calendar from '@/pages/calendar';
 import Sessions from '@/pages/sessions';
 import Projects from '@/pages/projects';
+import Todos from '@/pages/todos';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
 
 const queryClient = new QueryClient();
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/calendar" component={Calendar} />
       <Route path="/sessions" component={Sessions} />
       <Route path="/projects" component={Projects} />
+      <Route path="/todos" component={Todos} />
       <Route component={NotFound} />
     </Switch>
   );

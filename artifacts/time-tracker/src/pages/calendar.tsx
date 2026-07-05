@@ -2,8 +2,9 @@ import * as React from "react"
 import { Layout } from "@/components/layout/layout"
 import {
   useGetCalendar, useListSessions, useGetSubprojectCalendarEvents,
+  useGetTodoCalendarSummary,
 } from "@workspace/api-client-react"
-import type { SubprojectCalendarEvent } from "@workspace/api-client-react"
+import type { SubprojectCalendarEvent, TodoCalendarSummaryItem } from "@workspace/api-client-react"
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
   isToday, parseISO, addMonths, subMonths,
@@ -41,6 +42,11 @@ export default function Calendar() {
     { query: { queryKey: ["subproject-events", startDateStr, endDateStr] } }
   )
 
+  const { data: todoSummary } = useGetTodoCalendarSummary(
+    { startDate: startDateStr, endDate: endDateStr },
+    { query: { queryKey: ["todo-calendar", startDateStr, endDateStr] } }
+  )
+
   const { data: selectedDaySessions, isLoading: isLoadingSessions } = useListSessions(
     { startDate: selectedDate || undefined, endDate: selectedDate || undefined },
     { query: { enabled: !!selectedDate, queryKey: ["sessions", selectedDate] } }
@@ -52,7 +58,7 @@ export default function Calendar() {
 
   // index calendar data by date
   const dayDataByDate = React.useMemo(() => {
-    const map = new Map<string, typeof calendarData extends (infer T)[] | undefined ? T : never>()
+    const map = new Map<string, { date: string; totalMinutes: number }>()
     for (const d of calendarData ?? []) map.set(d.date, d)
     return map
   }, [calendarData])
@@ -67,8 +73,19 @@ export default function Calendar() {
     return map
   }, [subprojectEvents])
 
-  // subproject events for the selected day
+  // index todo summary by date → list letter
+  const todoByDate = React.useMemo(() => {
+    const map = new Map<string, TodoCalendarSummaryItem[]>()
+    for (const item of todoSummary ?? []) {
+      if (!map.has(item.date)) map.set(item.date, [])
+      map.get(item.date)!.push(item)
+    }
+    return map
+  }, [todoSummary])
+
+  // subproject + todo events for the selected day
   const selectedDaySubEvents = selectedDate ? (subEventsByDate.get(selectedDate) ?? []) : []
+  const selectedDayTodos = selectedDate ? (todoByDate.get(selectedDate) ?? []) : []
 
   const getIntensityClass = (minutes: number) => {
     if (minutes === 0) return "bg-card border border-border"
@@ -104,7 +121,7 @@ export default function Calendar() {
         </div>
 
         {/* legend */}
-        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+        <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
           <div className="flex items-center gap-1.5">
             <div className="w-2 h-2 rounded-full bg-primary/70" />
             <span>Active subproject day</span>
@@ -112,6 +129,10 @@ export default function Calendar() {
           <div className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3 w-3 text-emerald-500" />
             <span>Subproject completed</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded text-[9px] font-bold bg-violet-500 text-white flex items-center justify-center">T</div>
+            <span>To-do list completion</span>
           </div>
         </div>
 
@@ -137,15 +158,18 @@ export default function Calendar() {
                 const dayData = dayDataByDate.get(dStr)
                 const minutes = dayData?.totalMinutes ?? 0
                 const subEvents = subEventsByDate.get(dStr) ?? []
-                const completedEvents = subEvents.filter(e => e.eventType === "completed")
-                const activeEvents = subEvents.filter(e => e.eventType === "active")
+                const completedSubEvents = subEvents.filter(e => e.eventType === "completed")
+                const activeSubEvents = subEvents.filter(e => e.eventType === "active")
+                const todosForDay = todoByDate.get(dStr) ?? []
+                // Only show lists that have tasks
+                const todoListsWithTasks = todosForDay.filter(t => t.totalTasks > 0)
 
                 return (
                   <button
                     key={dStr}
                     onClick={() => setSelectedDate(dStr)}
                     className={cn(
-                      "h-28 rounded-xl p-3 flex flex-col justify-between transition-all relative overflow-hidden group hover:ring-2 hover:ring-primary hover:ring-offset-2 hover:ring-offset-background",
+                      "h-28 rounded-xl p-2 flex flex-col justify-between transition-all relative overflow-hidden group hover:ring-2 hover:ring-primary hover:ring-offset-2 hover:ring-offset-background",
                       getIntensityClass(minutes),
                       isToday(day) && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                       minutes === 0 && "hover:bg-muted"
@@ -153,7 +177,7 @@ export default function Calendar() {
                   >
                     {/* day number */}
                     <span className={cn(
-                      "text-sm font-bold w-7 h-7 flex items-center justify-center rounded-full",
+                      "text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full self-start",
                       getTextClass(minutes)
                     )}>
                       {format(day, "d")}
@@ -169,37 +193,46 @@ export default function Calendar() {
                         </div>
                       )}
 
-                      {/* subproject event indicators */}
-                      {(activeEvents.length > 0 || completedEvents.length > 0) && (
+                      {/* subproject event dots */}
+                      {(activeSubEvents.length > 0 || completedSubEvents.length > 0) && (
                         <div className="flex gap-1 flex-wrap justify-end">
-                          {/* completion checkmarks — show up to 3 */}
-                          {completedEvents.slice(0, 3).map((ev, idx) => (
-                            <div
-                              key={`c-${idx}`}
+                          {completedSubEvents.slice(0, 3).map((ev, idx) => (
+                            <div key={`c-${idx}`}
                               className="flex items-center justify-center w-4 h-4 rounded-full bg-white/90 shadow-sm"
-                              title={`✓ ${ev.subprojectName}`}
-                            >
-                              <CheckCircle2
-                                className="h-3 w-3"
-                                style={{ color: ev.subprojectColor ?? ev.projectColor }}
-                              />
+                              title={`✓ ${ev.subprojectName}`}>
+                              <CheckCircle2 className="h-3 w-3" style={{ color: ev.subprojectColor ?? ev.projectColor }} />
                             </div>
                           ))}
-                          {/* active dots */}
-                          {activeEvents.slice(0, 4).map((ev, idx) => (
-                            <div
-                              key={`a-${idx}`}
+                          {activeSubEvents.slice(0, 4).map((ev, idx) => (
+                            <div key={`a-${idx}`}
                               className="w-2 h-2 rounded-full border border-white/50 shadow-sm"
                               style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }}
-                              title={ev.subprojectName}
-                            />
+                              title={ev.subprojectName} />
                           ))}
-                          {/* overflow indicator */}
-                          {(activeEvents.length + completedEvents.length > 7) && (
-                            <div className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center">
-                              <span className="text-[9px] font-bold text-white">+</span>
-                            </div>
-                          )}
+                        </div>
+                      )}
+
+                      {/* todo list letter badges */}
+                      {todoListsWithTasks.length > 0 && (
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {todoListsWithTasks.slice(0, 4).map((item) => {
+                            const pct = item.percentage
+                            return (
+                              <div
+                                key={item.listId}
+                                className="relative flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold text-white shadow-sm overflow-hidden"
+                                style={{ backgroundColor: item.listColor }}
+                                title={`${item.listName}: ${pct}%`}
+                              >
+                                {/* fill indicator */}
+                                <div
+                                  className="absolute bottom-0 left-0 right-0 opacity-30 bg-black"
+                                  style={{ height: `${100 - pct}%` }}
+                                />
+                                <span className="relative z-10">{item.letter}</span>
+                              </div>
+                            )
+                          })}
                         </div>
                       )}
                     </div>
@@ -219,57 +252,83 @@ export default function Calendar() {
               <SheetTitle>
                 {selectedDate ? format(parseISO(selectedDate), "EEEE, MMMM do, yyyy") : ""}
               </SheetTitle>
-              <SheetDescription>Work sessions and subproject activity.</SheetDescription>
+              <SheetDescription>Work sessions and task activity.</SheetDescription>
             </SheetHeader>
           </div>
 
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-6">
 
-              {/* subproject completions for this day */}
-              {selectedDaySubEvents.filter(e => e.eventType === "completed").length > 0 && (
+              {/* todo list summaries */}
+              {selectedDayTodos.filter(t => t.totalTasks > 0).length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                    Completed
+                    To-Do Progress
                   </h3>
                   <div className="space-y-2">
-                    {selectedDaySubEvents
-                      .filter(e => e.eventType === "completed")
-                      .map((ev, idx) => (
-                        <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/50 border-emerald-100">
-                          <div
-                            className="w-3 h-3 rounded-full shrink-0"
-                            style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium">{ev.subprojectName}</p>
-                            <p className="text-xs text-muted-foreground">{ev.projectName}</p>
-                          </div>
-                          <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                    {selectedDayTodos.filter(t => t.totalTasks > 0).map(item => (
+                      <div key={item.listId} className="flex items-center gap-3 p-3 rounded-lg border bg-card">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
+                          style={{ backgroundColor: item.listColor }}>
+                          {item.letter}
                         </div>
-                      ))}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{item.listName}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all"
+                                style={{ width: `${item.percentage}%`, backgroundColor: item.listColor }}
+                              />
+                            </div>
+                            <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                              {item.completedTasks}/{item.totalTasks}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="font-mono font-bold text-sm shrink-0" style={{ color: item.listColor }}>
+                          {item.percentage}%
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
 
-              {/* active subprojects worked on this day */}
+              {/* subproject completions */}
+              {selectedDaySubEvents.filter(e => e.eventType === "completed").length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+                    Subprojects Completed
+                  </h3>
+                  <div className="space-y-2">
+                    {selectedDaySubEvents.filter(e => e.eventType === "completed").map((ev, idx) => (
+                      <div key={idx} className="flex items-center gap-3 p-3 rounded-lg border bg-emerald-50/50 border-emerald-100">
+                        <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{ev.subprojectName}</p>
+                          <p className="text-xs text-muted-foreground">{ev.projectName}</p>
+                        </div>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* active subprojects */}
               {selectedDaySubEvents.filter(e => e.eventType === "active").length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                     Subprojects Worked On
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {selectedDaySubEvents
-                      .filter(e => e.eventType === "active")
-                      .map((ev, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-card text-xs font-medium">
-                          <div
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }}
-                          />
-                          {ev.subprojectName}
-                        </div>
-                      ))}
+                    {selectedDaySubEvents.filter(e => e.eventType === "active").map((ev, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border bg-card text-xs font-medium">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: ev.subprojectColor ?? ev.projectColor }} />
+                        {ev.subprojectName}
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -301,7 +360,7 @@ export default function Calendar() {
                               <span className="font-semibold text-sm text-muted-foreground">Unassigned</span>
                             )}
                             {session.subprojectName && (
-                              <p className="text-xs text-muted-foreground pl-4.5 ml-4">↳ {session.subprojectName}</p>
+                              <p className="text-xs text-muted-foreground ml-4">↳ {session.subprojectName}</p>
                             )}
                           </div>
                           <div className="font-mono font-bold text-primary text-sm">{formatDuration(session.durationMinutes)}</div>

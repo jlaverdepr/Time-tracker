@@ -170,6 +170,81 @@ export interface Stats {
   allTimeSessions: number;
 }
 
+export interface TodoList {
+  id: number;
+  name: string;
+  color: string;
+  /** Single uppercase character shown in badges */
+  letter: string;
+  resetDaily: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface TodoListInput {
+  /** @minLength 1 */
+  name: string;
+  color: string;
+  /**
+     * @minLength 1
+     * @maxLength 1
+     */
+  letter: string;
+  resetDaily?: boolean;
+  sortOrder?: number;
+}
+
+export interface TodoListUpdate {
+  /** @minLength 1 */
+  name?: string;
+  color?: string;
+  /**
+     * @minLength 1
+     * @maxLength 1
+     */
+  letter?: string;
+  resetDaily?: boolean;
+}
+
+export interface TodoTask {
+  id: number;
+  listId: number;
+  text: string;
+  /** @nullable */
+  completedAt?: string | null;
+  /**
+     * YYYY-MM-DD of completion; used for daily-reset logic
+     * @nullable
+     */
+  completedDate?: string | null;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export interface TodoTaskInput {
+  listId: number;
+  /** @minLength 1 */
+  text: string;
+}
+
+export interface TodoTaskUpdate {
+  /** @minLength 1 */
+  text?: string;
+}
+
+export interface TodoCalendarSummaryItem {
+  /** YYYY-MM-DD */
+  date: string;
+  listId: number;
+  listName: string;
+  listColor: string;
+  letter: string;
+  totalTasks: number;
+  completedTasks: number;
+  /** 0-100 */
+  percentage: number;
+}
+
 export type ListSubprojectsParams = {
 /**
  * Filter by parent project
@@ -223,5 +298,23 @@ export type GetRecentSessionsParams = {
  * Max number of sessions to return (default 10)
  */
 limit?: number;
+};
+
+export type ListTodoTasksParams = {
+/**
+ * Filter by list
+ */
+listId?: number;
+};
+
+export type GetTodoCalendarSummaryParams = {
+/**
+ * YYYY-MM-DD
+ */
+startDate: string;
+/**
+ * YYYY-MM-DD
+ */
+endDate: string;
 };
 

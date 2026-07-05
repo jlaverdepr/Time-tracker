@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Link, useLocation } from "wouter"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Calendar as CalendarIcon, List, FolderGit2, Plus } from "lucide-react"
+import { LayoutDashboard, Calendar as CalendarIcon, List, FolderGit2, Plus, CheckSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LogTimeDialog } from "@/components/log-time-dialog"
 import { ActiveTimer } from "@/components/active-timer"
@@ -15,6 +15,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { name: "Calendar", href: "/calendar", icon: CalendarIcon },
     { name: "Sessions", href: "/sessions", icon: List },
     { name: "Projects", href: "/projects", icon: FolderGit2 },
+    { name: "To Do", href: "/todos", icon: CheckSquare },
   ]
 
   return (

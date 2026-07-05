@@ -16,6 +16,8 @@ tags:
     description: Subproject operations
   - name: sessions
     description: Work session operations
+  - name: todos
+    description: To-do list operations
 paths:
   /healthz:
     get:
@@ -473,6 +475,230 @@ paths:
                 items:
                   $ref: "#/components/schemas/Session"
 
+  /todo-lists:
+    get:
+      operationId: listTodoLists
+      tags: [todos]
+      summary: List all to-do lists
+      responses:
+        "200":
+          description: List of todo lists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoList"
+    post:
+      operationId: createTodoList
+      tags: [todos]
+      summary: Create a to-do list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoListInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoList"
+
+  /todo-lists/{id}:
+    patch:
+      operationId: updateTodoList
+      tags: [todos]
+      summary: Update a to-do list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoListUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoList"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTodoList
+      tags: [todos]
+      summary: Delete a to-do list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /todo-tasks:
+    get:
+      operationId: listTodoTasks
+      tags: [todos]
+      summary: List tasks, optionally filtered by list
+      parameters:
+        - name: listId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by list"
+      responses:
+        "200":
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoTask"
+    post:
+      operationId: createTodoTask
+      tags: [todos]
+      summary: Create a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoTaskInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoTask"
+
+  /todo-tasks/calendar-summary:
+    get:
+      operationId: getTodoCalendarSummary
+      tags: [todos]
+      summary: Per-day completion rates for all lists in a date range
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "YYYY-MM-DD"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "YYYY-MM-DD"
+      responses:
+        "200":
+          description: Array of daily list summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoCalendarSummaryItem"
+
+  /todo-tasks/{id}:
+    patch:
+      operationId: updateTodoTask
+      tags: [todos]
+      summary: Update a task's text
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoTaskUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoTask"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTodoTask
+      tags: [todos]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /todo-tasks/{id}/complete:
+    post:
+      operationId: completeTodoTask
+      tags: [todos]
+      summary: Mark a task as complete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoTask"
+        "404":
+          description: Not found
+
+  /todo-tasks/{id}/uncomplete:
+    post:
+      operationId: uncompleteTodoTask
+      tags: [todos]
+      summary: Mark a task as incomplete
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task uncompleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoTask"
+        "404":
+          description: Not found
+
 components:
   schemas:
     HealthStatus:
@@ -707,3 +933,116 @@ components:
           type: integer
         allTimeSessions:
           type: integer
+
+    TodoList:
+      type: object
+      required: [id, name, color, letter, resetDaily, sortOrder, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+        letter:
+          type: string
+          description: "Single uppercase character shown in badges"
+        resetDaily:
+          type: boolean
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+
+    TodoListInput:
+      type: object
+      required: [name, color, letter]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: string
+        letter:
+          type: string
+          minLength: 1
+          maxLength: 1
+        resetDaily:
+          type: boolean
+        sortOrder:
+          type: integer
+
+    TodoListUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: string
+        letter:
+          type: string
+          minLength: 1
+          maxLength: 1
+        resetDaily:
+          type: boolean
+
+    TodoTask:
+      type: object
+      required: [id, listId, text, sortOrder, createdAt]
+      properties:
+        id:
+          type: integer
+        listId:
+          type: integer
+        text:
+          type: string
+        completedAt:
+          type: ["string", "null"]
+        completedDate:
+          type: ["string", "null"]
+          description: "YYYY-MM-DD of completion; used for daily-reset logic"
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+
+    TodoTaskInput:
+      type: object
+      required: [listId, text]
+      properties:
+        listId:
+          type: integer
+        text:
+          type: string
+          minLength: 1
+
+    TodoTaskUpdate:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+
+    TodoCalendarSummaryItem:
+      type: object
+      required: [date, listId, listName, listColor, letter, totalTasks, completedTasks, percentage]
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        listId:
+          type: integer
+        listName:
+          type: string
+        listColor:
+          type: string
+        letter:
+          type: string
+        totalTasks:
+          type: integer
+        completedTasks:
+          type: integer
+        percentage:
+          type: integer
+          description: "0-100"

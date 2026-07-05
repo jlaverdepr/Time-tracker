@@ -24,9 +24,11 @@ import type {
   GetCalendarParams,
   GetRecentSessionsParams,
   GetSubprojectCalendarEventsParams,
+  GetTodoCalendarSummaryParams,
   HealthStatus,
   ListSessionsParams,
   ListSubprojectsParams,
+  ListTodoTasksParams,
   Project,
   ProjectInput,
   ProjectUpdate,
@@ -37,7 +39,14 @@ import type {
   Subproject,
   SubprojectCalendarEvent,
   SubprojectInput,
-  SubprojectUpdate
+  SubprojectUpdate,
+  TodoCalendarSummaryItem,
+  TodoList,
+  TodoListInput,
+  TodoListUpdate,
+  TodoTask,
+  TodoTaskInput,
+  TodoTaskUpdate
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -1708,4 +1717,811 @@ export function useGetRecentSessions<TData = Awaited<ReturnType<typeof getRecent
 
 
 
+
+export const getListTodoListsUrl = () => {
+
+
+
+
+  return `/api/todo-lists`
+}
+
+/**
+ * @summary List all to-do lists
+ */
+export const listTodoLists = async ( options?: RequestInit): Promise<TodoList[]> => {
+
+  return customFetch<TodoList[]>(getListTodoListsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTodoListsQueryKey = () => {
+    return [
+    `/api/todo-lists`
+    ] as const;
+    }
+
+
+export const getListTodoListsQueryOptions = <TData = Awaited<ReturnType<typeof listTodoLists>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTodoLists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTodoListsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTodoLists>>> = ({ signal }) => listTodoLists({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTodoLists>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTodoListsQueryResult = NonNullable<Awaited<ReturnType<typeof listTodoLists>>>
+export type ListTodoListsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all to-do lists
+ */
+
+export function useListTodoLists<TData = Awaited<ReturnType<typeof listTodoLists>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTodoLists>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTodoListsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTodoListUrl = () => {
+
+
+
+
+  return `/api/todo-lists`
+}
+
+/**
+ * @summary Create a to-do list
+ */
+export const createTodoList = async (todoListInput: TodoListInput, options?: RequestInit): Promise<TodoList> => {
+
+  return customFetch<TodoList>(getCreateTodoListUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoListInput)
+  }
+);}
+
+
+
+
+export const getCreateTodoListMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTodoList>>, TError,{data: BodyType<TodoListInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTodoList>>, TError,{data: BodyType<TodoListInput>}, TContext> => {
+
+const mutationKey = ['createTodoList'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTodoList>>, {data: BodyType<TodoListInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTodoList(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTodoListMutationResult = NonNullable<Awaited<ReturnType<typeof createTodoList>>>
+    export type CreateTodoListMutationBody = BodyType<TodoListInput>
+    export type CreateTodoListMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a to-do list
+ */
+export const useCreateTodoList = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTodoList>>, TError,{data: BodyType<TodoListInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTodoList>>,
+        TError,
+        {data: BodyType<TodoListInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTodoListMutationOptions(options));
+    }
+
+export const getUpdateTodoListUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-lists/${id}`
+}
+
+/**
+ * @summary Update a to-do list
+ */
+export const updateTodoList = async (id: number,
+    todoListUpdate: TodoListUpdate, options?: RequestInit): Promise<TodoList> => {
+
+  return customFetch<TodoList>(getUpdateTodoListUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoListUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateTodoListMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTodoList>>, TError,{id: number;data: BodyType<TodoListUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTodoList>>, TError,{id: number;data: BodyType<TodoListUpdate>}, TContext> => {
+
+const mutationKey = ['updateTodoList'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTodoList>>, {id: number;data: BodyType<TodoListUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTodoList(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTodoListMutationResult = NonNullable<Awaited<ReturnType<typeof updateTodoList>>>
+    export type UpdateTodoListMutationBody = BodyType<TodoListUpdate>
+    export type UpdateTodoListMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a to-do list
+ */
+export const useUpdateTodoList = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTodoList>>, TError,{id: number;data: BodyType<TodoListUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTodoList>>,
+        TError,
+        {id: number;data: BodyType<TodoListUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTodoListMutationOptions(options));
+    }
+
+export const getDeleteTodoListUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-lists/${id}`
+}
+
+/**
+ * @summary Delete a to-do list
+ */
+export const deleteTodoList = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteTodoListUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteTodoListMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTodoList>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTodoList>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteTodoList'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTodoList>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTodoList(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTodoListMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTodoList>>>
+
+    export type DeleteTodoListMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a to-do list
+ */
+export const useDeleteTodoList = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTodoList>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTodoList>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTodoListMutationOptions(options));
+    }
+
+export const getListTodoTasksUrl = (params?: ListTodoTasksParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/todo-tasks?${stringifiedParams}` : `/api/todo-tasks`
+}
+
+/**
+ * @summary List tasks, optionally filtered by list
+ */
+export const listTodoTasks = async (params?: ListTodoTasksParams, options?: RequestInit): Promise<TodoTask[]> => {
+
+  return customFetch<TodoTask[]>(getListTodoTasksUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTodoTasksQueryKey = (params?: ListTodoTasksParams,) => {
+    return [
+    `/api/todo-tasks`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getListTodoTasksQueryOptions = <TData = Awaited<ReturnType<typeof listTodoTasks>>, TError = ErrorType<unknown>>(params?: ListTodoTasksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTodoTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTodoTasksQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTodoTasks>>> = ({ signal }) => listTodoTasks(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTodoTasks>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTodoTasksQueryResult = NonNullable<Awaited<ReturnType<typeof listTodoTasks>>>
+export type ListTodoTasksQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List tasks, optionally filtered by list
+ */
+
+export function useListTodoTasks<TData = Awaited<ReturnType<typeof listTodoTasks>>, TError = ErrorType<unknown>>(
+ params?: ListTodoTasksParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTodoTasks>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTodoTasksQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateTodoTaskUrl = () => {
+
+
+
+
+  return `/api/todo-tasks`
+}
+
+/**
+ * @summary Create a task
+ */
+export const createTodoTask = async (todoTaskInput: TodoTaskInput, options?: RequestInit): Promise<TodoTask> => {
+
+  return customFetch<TodoTask>(getCreateTodoTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoTaskInput)
+  }
+);}
+
+
+
+
+export const getCreateTodoTaskMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTodoTask>>, TError,{data: BodyType<TodoTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTodoTask>>, TError,{data: BodyType<TodoTaskInput>}, TContext> => {
+
+const mutationKey = ['createTodoTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTodoTask>>, {data: BodyType<TodoTaskInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createTodoTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTodoTaskMutationResult = NonNullable<Awaited<ReturnType<typeof createTodoTask>>>
+    export type CreateTodoTaskMutationBody = BodyType<TodoTaskInput>
+    export type CreateTodoTaskMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a task
+ */
+export const useCreateTodoTask = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTodoTask>>, TError,{data: BodyType<TodoTaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTodoTask>>,
+        TError,
+        {data: BodyType<TodoTaskInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTodoTaskMutationOptions(options));
+    }
+
+export const getGetTodoCalendarSummaryUrl = (params: GetTodoCalendarSummaryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/todo-tasks/calendar-summary?${stringifiedParams}` : `/api/todo-tasks/calendar-summary`
+}
+
+/**
+ * @summary Per-day completion rates for all lists in a date range
+ */
+export const getTodoCalendarSummary = async (params: GetTodoCalendarSummaryParams, options?: RequestInit): Promise<TodoCalendarSummaryItem[]> => {
+
+  return customFetch<TodoCalendarSummaryItem[]>(getGetTodoCalendarSummaryUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTodoCalendarSummaryQueryKey = (params?: GetTodoCalendarSummaryParams,) => {
+    return [
+    `/api/todo-tasks/calendar-summary`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTodoCalendarSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getTodoCalendarSummary>>, TError = ErrorType<unknown>>(params: GetTodoCalendarSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodoCalendarSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTodoCalendarSummaryQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodoCalendarSummary>>> = ({ signal }) => getTodoCalendarSummary(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodoCalendarSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTodoCalendarSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getTodoCalendarSummary>>>
+export type GetTodoCalendarSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Per-day completion rates for all lists in a date range
+ */
+
+export function useGetTodoCalendarSummary<TData = Awaited<ReturnType<typeof getTodoCalendarSummary>>, TError = ErrorType<unknown>>(
+ params: GetTodoCalendarSummaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodoCalendarSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTodoCalendarSummaryQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateTodoTaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-tasks/${id}`
+}
+
+/**
+ * @summary Update a task's text
+ */
+export const updateTodoTask = async (id: number,
+    todoTaskUpdate: TodoTaskUpdate, options?: RequestInit): Promise<TodoTask> => {
+
+  return customFetch<TodoTask>(getUpdateTodoTaskUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoTaskUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateTodoTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTodoTask>>, TError,{id: number;data: BodyType<TodoTaskUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTodoTask>>, TError,{id: number;data: BodyType<TodoTaskUpdate>}, TContext> => {
+
+const mutationKey = ['updateTodoTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTodoTask>>, {id: number;data: BodyType<TodoTaskUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTodoTask(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTodoTaskMutationResult = NonNullable<Awaited<ReturnType<typeof updateTodoTask>>>
+    export type UpdateTodoTaskMutationBody = BodyType<TodoTaskUpdate>
+    export type UpdateTodoTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a task's text
+ */
+export const useUpdateTodoTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTodoTask>>, TError,{id: number;data: BodyType<TodoTaskUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTodoTask>>,
+        TError,
+        {id: number;data: BodyType<TodoTaskUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTodoTaskMutationOptions(options));
+    }
+
+export const getDeleteTodoTaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-tasks/${id}`
+}
+
+/**
+ * @summary Delete a task
+ */
+export const deleteTodoTask = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteTodoTaskUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteTodoTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTodoTask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTodoTask>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteTodoTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTodoTask>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTodoTask(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTodoTaskMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTodoTask>>>
+
+    export type DeleteTodoTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a task
+ */
+export const useDeleteTodoTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTodoTask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTodoTask>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTodoTaskMutationOptions(options));
+    }
+
+export const getCompleteTodoTaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-tasks/${id}/complete`
+}
+
+/**
+ * @summary Mark a task as complete
+ */
+export const completeTodoTask = async (id: number, options?: RequestInit): Promise<TodoTask> => {
+
+  return customFetch<TodoTask>(getCompleteTodoTaskUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCompleteTodoTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeTodoTask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof completeTodoTask>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['completeTodoTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof completeTodoTask>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  completeTodoTask(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CompleteTodoTaskMutationResult = NonNullable<Awaited<ReturnType<typeof completeTodoTask>>>
+
+    export type CompleteTodoTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark a task as complete
+ */
+export const useCompleteTodoTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof completeTodoTask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof completeTodoTask>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getCompleteTodoTaskMutationOptions(options));
+    }
+
+export const getUncompleteTodoTaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-tasks/${id}/uncomplete`
+}
+
+/**
+ * @summary Mark a task as incomplete
+ */
+export const uncompleteTodoTask = async (id: number, options?: RequestInit): Promise<TodoTask> => {
+
+  return customFetch<TodoTask>(getUncompleteTodoTaskUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getUncompleteTodoTaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uncompleteTodoTask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof uncompleteTodoTask>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['uncompleteTodoTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof uncompleteTodoTask>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  uncompleteTodoTask(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UncompleteTodoTaskMutationResult = NonNullable<Awaited<ReturnType<typeof uncompleteTodoTask>>>
+
+    export type UncompleteTodoTaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Mark a task as incomplete
+ */
+export const useUncompleteTodoTask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof uncompleteTodoTask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof uncompleteTodoTask>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getUncompleteTodoTaskMutationOptions(options));
+    }
 

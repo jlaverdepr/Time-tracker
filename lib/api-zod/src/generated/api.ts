@@ -445,3 +445,218 @@ export const GetRecentSessionsResponseItem = zod.object({
 export const GetRecentSessionsResponse = zod.array(GetRecentSessionsResponseItem)
 
 
+/**
+ * @summary List all to-do lists
+ */
+export const ListTodoListsResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string(),
+  "letter": zod.string().describe('Single uppercase character shown in badges'),
+  "resetDaily": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListTodoListsResponse = zod.array(ListTodoListsResponseItem)
+
+
+/**
+ * @summary Create a to-do list
+ */
+
+export const createTodoListBodyLetterMax = 1;
+
+
+
+export const CreateTodoListBody = zod.object({
+  "name": zod.string().min(1),
+  "color": zod.string(),
+  "letter": zod.string().min(1).max(createTodoListBodyLetterMax),
+  "resetDaily": zod.boolean().optional(),
+  "sortOrder": zod.number().optional()
+})
+
+export const CreateTodoListResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string(),
+  "letter": zod.string().describe('Single uppercase character shown in badges'),
+  "resetDaily": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a to-do list
+ */
+export const UpdateTodoListParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+export const updateTodoListBodyLetterMax = 1;
+
+
+
+export const UpdateTodoListBody = zod.object({
+  "name": zod.string().min(1).optional(),
+  "color": zod.string().optional(),
+  "letter": zod.string().min(1).max(updateTodoListBodyLetterMax).optional(),
+  "resetDaily": zod.boolean().optional()
+})
+
+export const UpdateTodoListResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "color": zod.string(),
+  "letter": zod.string().describe('Single uppercase character shown in badges'),
+  "resetDaily": zod.boolean(),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a to-do list
+ */
+export const DeleteTodoListParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteTodoListResponse = zod.void()
+
+
+/**
+ * @summary List tasks, optionally filtered by list
+ */
+export const ListTodoTasksQueryParams = zod.object({
+  "listId": zod.coerce.number().optional().describe('Filter by list')
+})
+
+export const ListTodoTasksResponseItem = zod.object({
+  "id": zod.number(),
+  "listId": zod.number(),
+  "text": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListTodoTasksResponse = zod.array(ListTodoTasksResponseItem)
+
+
+/**
+ * @summary Create a task
+ */
+
+
+
+export const CreateTodoTaskBody = zod.object({
+  "listId": zod.number(),
+  "text": zod.string().min(1)
+})
+
+export const CreateTodoTaskResponse = zod.object({
+  "id": zod.number(),
+  "listId": zod.number(),
+  "text": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Per-day completion rates for all lists in a date range
+ */
+export const GetTodoCalendarSummaryQueryParams = zod.object({
+  "startDate": zod.coerce.string().describe('YYYY-MM-DD'),
+  "endDate": zod.coerce.string().describe('YYYY-MM-DD')
+})
+
+export const GetTodoCalendarSummaryResponseItem = zod.object({
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "listId": zod.number(),
+  "listName": zod.string(),
+  "listColor": zod.string(),
+  "letter": zod.string(),
+  "totalTasks": zod.number(),
+  "completedTasks": zod.number(),
+  "percentage": zod.number().describe('0-100')
+})
+export const GetTodoCalendarSummaryResponse = zod.array(GetTodoCalendarSummaryResponseItem)
+
+
+/**
+ * @summary Update a task's text
+ */
+export const UpdateTodoTaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateTodoTaskBody = zod.object({
+  "text": zod.string().min(1).optional()
+})
+
+export const UpdateTodoTaskResponse = zod.object({
+  "id": zod.number(),
+  "listId": zod.number(),
+  "text": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a task
+ */
+export const DeleteTodoTaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteTodoTaskResponse = zod.void()
+
+
+/**
+ * @summary Mark a task as complete
+ */
+export const CompleteTodoTaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const CompleteTodoTaskResponse = zod.object({
+  "id": zod.number(),
+  "listId": zod.number(),
+  "text": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Mark a task as incomplete
+ */
+export const UncompleteTodoTaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UncompleteTodoTaskResponse = zod.object({
+  "id": zod.number(),
+  "listId": zod.number(),
+  "text": zod.string(),
+  "completedAt": zod.string().nullish(),
+  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "sortOrder": zod.number(),
+  "createdAt": zod.string()
+})
+
+

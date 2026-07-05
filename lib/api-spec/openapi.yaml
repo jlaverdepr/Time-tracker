@@ -3,13 +3,17 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Work Time Tracker API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: projects
+    description: Project operations
+  - name: sessions
+    description: Work session operations
 paths:
   /healthz:
     get:
@@ -24,6 +28,252 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /projects:
+    get:
+      operationId: listProjects
+      tags: [projects]
+      summary: List all projects
+      responses:
+        "200":
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Project"
+    post:
+      operationId: createProject
+      tags: [projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+
+  /projects/{id}:
+    patch:
+      operationId: updateProject
+      tags: [projects]
+      summary: Update a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Project"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProject
+      tags: [projects]
+      summary: Delete a project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: List sessions, optionally filtered by date range
+      parameters:
+        - name: startDate
+          in: query
+          schema:
+            type: string
+          description: "Filter sessions on or after this date (YYYY-MM-DD)"
+        - name: endDate
+          in: query
+          schema:
+            type: string
+          description: "Filter sessions on or before this date (YYYY-MM-DD)"
+        - name: projectId
+          in: query
+          schema:
+            type: integer
+          description: "Filter by project"
+      responses:
+        "200":
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a work session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{id}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Get a session by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateSession
+      tags: [sessions]
+      summary: Update a work session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Delete a work session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /sessions/calendar:
+    get:
+      operationId: getCalendar
+      tags: [sessions]
+      summary: Get per-day work totals for a date range (calendar view)
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "Start of range (YYYY-MM-DD)"
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "End of range (YYYY-MM-DD)"
+      responses:
+        "200":
+          description: Array of daily summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DaySummary"
+
+  /sessions/stats:
+    get:
+      operationId: getStats
+      tags: [sessions]
+      summary: Get aggregate stats (today, this week, this month, all-time)
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /sessions/recent:
+    get:
+      operationId: getRecentSessions
+      tags: [sessions]
+      summary: Get the most recent sessions
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+          description: "Max number of sessions to return (default 10)"
+      responses:
+        "200":
+          description: Recent sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +284,149 @@ components:
       required:
         - status
 
+    Project:
+      type: object
+      required: [id, name, color, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        color:
+          type: string
+          description: "Hex color e.g. #3B82F6"
+        createdAt:
+          type: string
+
+    ProjectInput:
+      type: object
+      required: [name, color]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: string
+
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        color:
+          type: string
+
+    Session:
+      type: object
+      required: [id, date, durationMinutes, createdAt]
+      properties:
+        id:
+          type: integer
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        projectColor:
+          type: ["string", "null"]
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        startTime:
+          type: ["string", "null"]
+          description: "HH:MM (24h)"
+        endTime:
+          type: ["string", "null"]
+          description: "HH:MM (24h)"
+        durationMinutes:
+          type: integer
+          description: "Duration in minutes"
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    SessionInput:
+      type: object
+      required: [date, durationMinutes]
+      properties:
+        projectId:
+          type: ["integer", "null"]
+        date:
+          type: string
+        startTime:
+          type: ["string", "null"]
+        endTime:
+          type: ["string", "null"]
+        durationMinutes:
+          type: integer
+          minimum: 1
+        notes:
+          type: ["string", "null"]
+
+    SessionUpdate:
+      type: object
+      properties:
+        projectId:
+          type: ["integer", "null"]
+        date:
+          type: string
+        startTime:
+          type: ["string", "null"]
+        endTime:
+          type: ["string", "null"]
+        durationMinutes:
+          type: integer
+          minimum: 1
+        notes:
+          type: ["string", "null"]
+
+    DaySummary:
+      type: object
+      required: [date, totalMinutes, sessionCount]
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        totalMinutes:
+          type: integer
+        sessionCount:
+          type: integer
+        projectBreakdown:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectMinutes"
+
+    ProjectMinutes:
+      type: object
+      required: [projectId, projectName, projectColor, minutes]
+      properties:
+        projectId:
+          type: ["integer", "null"]
+        projectName:
+          type: ["string", "null"]
+        projectColor:
+          type: ["string", "null"]
+        minutes:
+          type: integer
+
+    Stats:
+      type: object
+      required: [todayMinutes, weekMinutes, monthMinutes, allTimeMinutes, todaySessions, weekSessions, monthSessions, allTimeSessions]
+      properties:
+        todayMinutes:
+          type: integer
+        weekMinutes:
+          type: integer
+        monthMinutes:
+          type: integer
+        allTimeMinutes:
+          type: integer
+        todaySessions:
+          type: integer
+        weekSessions:
+          type: integer
+        monthSessions:
+          type: integer
+        allTimeSessions:
+          type: integer

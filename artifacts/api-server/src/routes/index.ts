@@ -1,8 +1,12 @@
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
+import projectsRouter from "./projects";
+import sessionsRouter from "./sessions";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(projectsRouter);
+router.use(sessionsRouter);
 
 export default router;

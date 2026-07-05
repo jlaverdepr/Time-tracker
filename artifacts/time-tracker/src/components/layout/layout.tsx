@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 import { LayoutDashboard, Calendar as CalendarIcon, List, FolderGit2, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { LogTimeDialog } from "@/components/log-time-dialog"
+import { ActiveTimer } from "@/components/active-timer"
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
@@ -48,14 +49,17 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
 
-        <div className="p-4 border-t border-sidebar-border">
-          <Button 
-            className="w-full gap-2 font-semibold shadow-sm" 
-            onClick={() => setIsLogTimeOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Log Time
-          </Button>
+        <div className="border-t border-sidebar-border pt-3">
+          <ActiveTimer />
+          <div className="px-4 pb-4">
+            <Button
+              className="w-full gap-2 font-semibold shadow-sm"
+              onClick={() => setIsLogTimeOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Log Time
+            </Button>
+          </div>
         </div>
       </aside>
 

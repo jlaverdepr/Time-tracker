@@ -551,6 +551,29 @@ paths:
         "404":
           description: Not found
 
+  /todo-lists/{id}/clear-completed:
+    post:
+      operationId: clearCompletedTodoTasks
+      tags: [todos]
+      summary: Soft-clear (hide) all currently-completed tasks in a list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [clearedCount]
+                properties:
+                  clearedCount:
+                    type: integer
+
   /todo-tasks:
     get:
       operationId: listTodoTasks
@@ -567,6 +590,16 @@ paths:
           schema:
             type: integer
           description: "Filter by project"
+        - name: includeCleared
+          in: query
+          schema:
+            type: boolean
+          description: "Include soft-cleared tasks (default false)"
+        - name: includeFuture
+          in: query
+          schema:
+            type: boolean
+          description: "Include tasks scheduled for a future date (default false)"
       responses:
         "200":
           description: List of tasks
@@ -621,6 +654,52 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/TodoCalendarSummaryItem"
+
+  /todo-tasks/day-detail:
+    get:
+      operationId: getTodoDayDetail
+      tags: [todos]
+      summary: Reconstructed task list + completion state for a list on a specific date
+      parameters:
+        - name: listId
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: query
+          required: true
+          schema:
+            type: string
+          description: "YYYY-MM-DD"
+      responses:
+        "200":
+          description: Tasks as they stood on that date
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TodoDayDetailTask"
+
+  /todo-tasks/day-detail/toggle:
+    post:
+      operationId: toggleTodoDayDetailTask
+      tags: [todos]
+      summary: Toggle a task's completion for a specific (typically past) date
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoDayDetailToggleInput"
+      responses:
+        "200":
+          description: Toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoDayDetailTask"
 
   /todo-tasks/{id}:
     patch:
@@ -1350,7 +1429,7 @@ components:
 
     TodoList:
       type: object
-      required: [id, name, color, letter, resetDaily, sortOrder, createdAt]
+      required: [id, name, color, letter, resetDaily, autoClearCompleted, sortOrder, createdAt]
       properties:
         id:
           type: integer
@@ -1363,6 +1442,9 @@ components:
           description: "Single uppercase character shown in badges"
         resetDaily:
           type: boolean
+        autoClearCompleted:
+          type: boolean
+          description: "If true, completed tasks are hidden (soft-cleared) once the day ends"
         sortOrder:
           type: integer
         createdAt:
@@ -1383,6 +1465,8 @@ components:
           maxLength: 1
         resetDaily:
           type: boolean
+        autoClearCompleted:
+          type: boolean
         sortOrder:
           type: integer
 
@@ -1400,6 +1484,10 @@ components:
           maxLength: 1
         resetDaily:
           type: boolean
+        autoClearCompleted:
+          type: boolean
+        sortOrder:
+          type: integer
 
     TodoTask:
       type: object
@@ -1420,6 +1508,15 @@ components:
         completedDate:
           type: ["string", "null"]
           description: "YYYY-MM-DD of completion; used for daily-reset logic"
+        clearedAt:
+          type: ["string", "null"]
+          description: "Soft-hide timestamp; cleared tasks no longer show on the live list"
+        scheduledDate:
+          type: ["string", "null"]
+          description: "YYYY-MM-DD; if set and in the future, task is 'prepared' and hidden until then"
+        reminderTime:
+          type: ["string", "null"]
+          description: "HH:mm; opt-in reminder time of day"
         sortOrder:
           type: integer
         createdAt:
@@ -1438,6 +1535,12 @@ components:
           type: integer
         subprojectId:
           type: integer
+        scheduledDate:
+          type: string
+          description: "YYYY-MM-DD"
+        reminderTime:
+          type: string
+          description: "HH:mm"
 
     TodoTaskUpdate:
       type: object
@@ -1449,10 +1552,14 @@ components:
           type: ["integer", "null"]
         subprojectId:
           type: ["integer", "null"]
+        scheduledDate:
+          type: ["string", "null"]
+        reminderTime:
+          type: ["string", "null"]
 
     TodoCalendarSummaryItem:
       type: object
-      required: [date, listId, listName, listColor, letter, totalTasks, completedTasks, percentage]
+      required: [date, listId, listName, listColor, letter, totalTasks, completedTasks, preparedTasks, percentage]
       properties:
         date:
           type: string
@@ -1469,9 +1576,35 @@ components:
           type: integer
         completedTasks:
           type: integer
+        preparedTasks:
+          type: integer
+          description: "Count of tasks scheduled (prepared in advance) for this date"
         percentage:
           type: integer
           description: "0-100"
+
+    TodoDayDetailTask:
+      type: object
+      required: [taskId, text, completed]
+      properties:
+        taskId:
+          type: integer
+        text:
+          type: string
+        completed:
+          type: boolean
+
+    TodoDayDetailToggleInput:
+      type: object
+      required: [taskId, date, completed]
+      properties:
+        taskId:
+          type: integer
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        completed:
+          type: boolean
 
     GymExerciseCategory:
       type: string

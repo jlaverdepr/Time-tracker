@@ -13,6 +13,8 @@ export interface TodoList {
   /** Single uppercase character shown in badges */
   letter: string;
   resetDaily: boolean;
+  /** If true, completed tasks are hidden (soft-cleared) once the day ends */
+  autoClearCompleted: boolean;
   sortOrder: number;
   createdAt: string;
 }

@@ -177,6 +177,8 @@ export interface TodoList {
   /** Single uppercase character shown in badges */
   letter: string;
   resetDaily: boolean;
+  /** If true, completed tasks are hidden (soft-cleared) once the day ends */
+  autoClearCompleted: boolean;
   sortOrder: number;
   createdAt: string;
 }
@@ -191,6 +193,7 @@ export interface TodoListInput {
      */
   letter: string;
   resetDaily?: boolean;
+  autoClearCompleted?: boolean;
   sortOrder?: number;
 }
 
@@ -204,6 +207,8 @@ export interface TodoListUpdate {
      */
   letter?: string;
   resetDaily?: boolean;
+  autoClearCompleted?: boolean;
+  sortOrder?: number;
 }
 
 export interface TodoTask {
@@ -221,6 +226,21 @@ export interface TodoTask {
      * @nullable
      */
   completedDate?: string | null;
+  /**
+     * Soft-hide timestamp; cleared tasks no longer show on the live list
+     * @nullable
+     */
+  clearedAt?: string | null;
+  /**
+     * YYYY-MM-DD; if set and in the future, task is 'prepared' and hidden until then
+     * @nullable
+     */
+  scheduledDate?: string | null;
+  /**
+     * HH:mm; opt-in reminder time of day
+     * @nullable
+     */
+  reminderTime?: string | null;
   sortOrder: number;
   createdAt: string;
 }
@@ -231,6 +251,10 @@ export interface TodoTaskInput {
   text: string;
   projectId?: number;
   subprojectId?: number;
+  /** YYYY-MM-DD */
+  scheduledDate?: string;
+  /** HH:mm */
+  reminderTime?: string;
 }
 
 export interface TodoTaskUpdate {
@@ -240,6 +264,10 @@ export interface TodoTaskUpdate {
   projectId?: number | null;
   /** @nullable */
   subprojectId?: number | null;
+  /** @nullable */
+  scheduledDate?: string | null;
+  /** @nullable */
+  reminderTime?: string | null;
 }
 
 export interface TodoCalendarSummaryItem {
@@ -251,8 +279,23 @@ export interface TodoCalendarSummaryItem {
   letter: string;
   totalTasks: number;
   completedTasks: number;
+  /** Count of tasks scheduled (prepared in advance) for this date */
+  preparedTasks: number;
   /** 0-100 */
   percentage: number;
+}
+
+export interface TodoDayDetailTask {
+  taskId: number;
+  text: string;
+  completed: boolean;
+}
+
+export interface TodoDayDetailToggleInput {
+  taskId: number;
+  /** YYYY-MM-DD */
+  date: string;
+  completed: boolean;
 }
 
 export type GymExerciseCategory = typeof GymExerciseCategory[keyof typeof GymExerciseCategory];
@@ -448,6 +491,10 @@ export type GetRecentSessionsParams = {
 limit?: number;
 };
 
+export type ClearCompletedTodoTasks200 = {
+  clearedCount: number;
+};
+
 export type ListTodoTasksParams = {
 /**
  * Filter by list
@@ -457,6 +504,14 @@ listId?: number;
  * Filter by project
  */
 projectId?: number;
+/**
+ * Include soft-cleared tasks (default false)
+ */
+includeCleared?: boolean;
+/**
+ * Include tasks scheduled for a future date (default false)
+ */
+includeFuture?: boolean;
 };
 
 export type GetTodoCalendarSummaryParams = {
@@ -468,6 +523,14 @@ startDate: string;
  * YYYY-MM-DD
  */
 endDate: string;
+};
+
+export type GetTodoDayDetailParams = {
+listId: number;
+/**
+ * YYYY-MM-DD
+ */
+date: string;
 };
 
 export type ListGymWorkoutEntriesParams = {

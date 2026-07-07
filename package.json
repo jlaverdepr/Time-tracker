@@ -4,9 +4,13 @@
   "license": "MIT",
   "scripts": {
     "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "dev:api": "pnpm --filter @workspace/api-server run dev",
+    "dev:web": "pnpm --filter @workspace/time-tracker run dev",
+    "db:push": "DB_PATH=${DB_PATH:-.local/time-tracker.sqlite} pnpm --filter @workspace/db run push",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build:desktop": "pnpm --filter desktop run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --filter \"./desktop\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./desktop\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {

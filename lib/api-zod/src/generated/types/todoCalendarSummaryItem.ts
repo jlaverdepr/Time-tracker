@@ -15,6 +15,8 @@ export interface TodoCalendarSummaryItem {
   letter: string;
   totalTasks: number;
   completedTasks: number;
+  /** Count of tasks scheduled (prepared in advance) for this date */
+  preparedTasks: number;
   /** 0-100 */
   percentage: number;
 }

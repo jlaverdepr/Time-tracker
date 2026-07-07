@@ -454,6 +454,7 @@ export const ListTodoListsResponseItem = zod.object({
   "color": zod.string(),
   "letter": zod.string().describe('Single uppercase character shown in badges'),
   "resetDaily": zod.boolean(),
+  "autoClearCompleted": zod.boolean().describe('If true, completed tasks are hidden (soft-cleared) once the day ends'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -473,6 +474,7 @@ export const CreateTodoListBody = zod.object({
   "color": zod.string(),
   "letter": zod.string().min(1).max(createTodoListBodyLetterMax),
   "resetDaily": zod.boolean().optional(),
+  "autoClearCompleted": zod.boolean().optional(),
   "sortOrder": zod.number().optional()
 })
 
@@ -482,6 +484,7 @@ export const CreateTodoListResponse = zod.object({
   "color": zod.string(),
   "letter": zod.string().describe('Single uppercase character shown in badges'),
   "resetDaily": zod.boolean(),
+  "autoClearCompleted": zod.boolean().describe('If true, completed tasks are hidden (soft-cleared) once the day ends'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -503,7 +506,9 @@ export const UpdateTodoListBody = zod.object({
   "name": zod.string().min(1).optional(),
   "color": zod.string().optional(),
   "letter": zod.string().min(1).max(updateTodoListBodyLetterMax).optional(),
-  "resetDaily": zod.boolean().optional()
+  "resetDaily": zod.boolean().optional(),
+  "autoClearCompleted": zod.boolean().optional(),
+  "sortOrder": zod.number().optional()
 })
 
 export const UpdateTodoListResponse = zod.object({
@@ -512,6 +517,7 @@ export const UpdateTodoListResponse = zod.object({
   "color": zod.string(),
   "letter": zod.string().describe('Single uppercase character shown in badges'),
   "resetDaily": zod.boolean(),
+  "autoClearCompleted": zod.boolean().describe('If true, completed tasks are hidden (soft-cleared) once the day ends'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -528,11 +534,25 @@ export const DeleteTodoListResponse = zod.void()
 
 
 /**
+ * @summary Soft-clear (hide) all currently-completed tasks in a list
+ */
+export const ClearCompletedTodoTasksParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const ClearCompletedTodoTasksResponse = zod.object({
+  "clearedCount": zod.number()
+})
+
+
+/**
  * @summary List tasks, optionally filtered by list
  */
 export const ListTodoTasksQueryParams = zod.object({
   "listId": zod.coerce.number().optional().describe('Filter by list'),
-  "projectId": zod.coerce.number().optional().describe('Filter by project')
+  "projectId": zod.coerce.number().optional().describe('Filter by project'),
+  "includeCleared": zod.coerce.boolean().optional().describe('Include soft-cleared tasks (default false)'),
+  "includeFuture": zod.coerce.boolean().optional().describe('Include tasks scheduled for a future date (default false)')
 })
 
 export const ListTodoTasksResponseItem = zod.object({
@@ -543,6 +563,9 @@ export const ListTodoTasksResponseItem = zod.object({
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
+  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -559,7 +582,9 @@ export const CreateTodoTaskBody = zod.object({
   "listId": zod.number(),
   "text": zod.string().min(1),
   "projectId": zod.number().optional(),
-  "subprojectId": zod.number().optional()
+  "subprojectId": zod.number().optional(),
+  "scheduledDate": zod.string().optional().describe('YYYY-MM-DD'),
+  "reminderTime": zod.string().optional().describe('HH:mm')
 })
 
 export const CreateTodoTaskResponse = zod.object({
@@ -570,6 +595,9 @@ export const CreateTodoTaskResponse = zod.object({
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
+  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -591,9 +619,42 @@ export const GetTodoCalendarSummaryResponseItem = zod.object({
   "letter": zod.string(),
   "totalTasks": zod.number(),
   "completedTasks": zod.number(),
+  "preparedTasks": zod.number().describe('Count of tasks scheduled (prepared in advance) for this date'),
   "percentage": zod.number().describe('0-100')
 })
 export const GetTodoCalendarSummaryResponse = zod.array(GetTodoCalendarSummaryResponseItem)
+
+
+/**
+ * @summary Reconstructed task list + completion state for a list on a specific date
+ */
+export const GetTodoDayDetailQueryParams = zod.object({
+  "listId": zod.coerce.number(),
+  "date": zod.coerce.string().describe('YYYY-MM-DD')
+})
+
+export const GetTodoDayDetailResponseItem = zod.object({
+  "taskId": zod.number(),
+  "text": zod.string(),
+  "completed": zod.boolean()
+})
+export const GetTodoDayDetailResponse = zod.array(GetTodoDayDetailResponseItem)
+
+
+/**
+ * @summary Toggle a task's completion for a specific (typically past) date
+ */
+export const ToggleTodoDayDetailTaskBody = zod.object({
+  "taskId": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "completed": zod.boolean()
+})
+
+export const ToggleTodoDayDetailTaskResponse = zod.object({
+  "taskId": zod.number(),
+  "text": zod.string(),
+  "completed": zod.boolean()
+})
 
 
 /**
@@ -609,7 +670,9 @@ export const UpdateTodoTaskParams = zod.object({
 export const UpdateTodoTaskBody = zod.object({
   "text": zod.string().min(1).optional(),
   "projectId": zod.number().nullish(),
-  "subprojectId": zod.number().nullish()
+  "subprojectId": zod.number().nullish(),
+  "scheduledDate": zod.string().nullish(),
+  "reminderTime": zod.string().nullish()
 })
 
 export const UpdateTodoTaskResponse = zod.object({
@@ -620,6 +683,9 @@ export const UpdateTodoTaskResponse = zod.object({
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
+  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -650,6 +716,9 @@ export const CompleteTodoTaskResponse = zod.object({
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
+  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -670,6 +739,9 @@ export const UncompleteTodoTaskResponse = zod.object({
   "text": zod.string(),
   "completedAt": zod.string().nullish(),
   "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
+  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
+  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })

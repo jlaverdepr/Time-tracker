@@ -15,4 +15,12 @@ listId?: number;
  * Filter by project
  */
 projectId?: number;
+/**
+ * Include soft-cleared tasks (default false)
+ */
+includeCleared?: boolean;
+/**
+ * Include tasks scheduled for a future date (default false)
+ */
+includeFuture?: boolean;
 };

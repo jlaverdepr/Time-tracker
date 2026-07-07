@@ -12,4 +12,8 @@ export interface TodoTaskInput {
   text: string;
   projectId?: number;
   subprojectId?: number;
+  /** YYYY-MM-DD */
+  scheduledDate?: string;
+  /** HH:mm */
+  reminderTime?: string;
 }

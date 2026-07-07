@@ -16,4 +16,6 @@ export interface TodoListUpdate {
      */
   letter?: string;
   resetDaily?: boolean;
+  autoClearCompleted?: boolean;
+  sortOrder?: number;
 }

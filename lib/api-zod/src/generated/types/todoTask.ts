@@ -21,6 +21,21 @@ export interface TodoTask {
      * @nullable
      */
   completedDate?: string | null;
+  /**
+     * Soft-hide timestamp; cleared tasks no longer show on the live list
+     * @nullable
+     */
+  clearedAt?: string | null;
+  /**
+     * YYYY-MM-DD; if set and in the future, task is 'prepared' and hidden until then
+     * @nullable
+     */
+  scheduledDate?: string | null;
+  /**
+     * HH:mm; opt-in reminder time of day
+     * @nullable
+     */
+  reminderTime?: string | null;
   sortOrder: number;
   createdAt: string;
 }

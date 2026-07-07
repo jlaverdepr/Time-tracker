@@ -16,5 +16,6 @@ export interface TodoListInput {
      */
   letter: string;
   resetDaily?: boolean;
+  autoClearCompleted?: boolean;
   sortOrder?: number;
 }

@@ -163,7 +163,7 @@ router.get("/sessions/calendar", async (req, res): Promise<void> => {
 });
 
 // GET /sessions/stats
-router.get("/sessions/stats", async (req, res): Promise<void> => {
+router.get("/sessions/stats", async (_req, res): Promise<void> => {
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
   const dayOfWeek = now.getDay();

@@ -1,7 +1,7 @@
 import * as React from "react"
 import { format, startOfWeek, endOfWeek } from "date-fns"
 import { Layout } from "@/components/layout/layout"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   useGetStats, useGetRecentSessions, useListTodoLists, useListTodoTasks, useListGymWorkouts,
 } from "@workspace/api-client-react"

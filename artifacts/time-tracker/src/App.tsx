@@ -8,8 +8,15 @@ import Projects from '@/pages/projects';
 import Todos from '@/pages/todos';
 import GymTrack from '@/pages/gym-track';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { useTaskReminders } from '@/hooks/use-task-reminders';
+import { TimerProvider } from '@/hooks/use-timer';
 
 const queryClient = new QueryClient();
+
+function TaskReminders() {
+  useTaskReminders();
+  return null;
+}
 
 function NotFound() {
   return (
@@ -41,10 +48,13 @@ function App() {
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
-        <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, '')}>
-          <Router />
-        </WouterRouter>
-        <Toaster />
+        <TimerProvider>
+          <WouterRouter base={import.meta.env.BASE_URL?.replace(/\/$/, '')}>
+            <Router />
+          </WouterRouter>
+          <TaskReminders />
+          <Toaster />
+        </TimerProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

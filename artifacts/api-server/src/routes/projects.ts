@@ -32,7 +32,7 @@ function serializeProject(p: {
   };
 }
 
-router.get("/projects", async (req, res): Promise<void> => {
+router.get("/projects", async (_req, res): Promise<void> => {
   const projects = await db.select().from(projectsTable).orderBy(projectsTable.createdAt);
   res.json(ListProjectsResponse.parse(projects.map(serializeProject)));
 });

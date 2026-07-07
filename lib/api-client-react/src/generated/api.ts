@@ -20,11 +20,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  ClearCompletedTodoTasks200,
   DaySummary,
   GetCalendarParams,
   GetRecentSessionsParams,
   GetSubprojectCalendarEventsParams,
   GetTodoCalendarSummaryParams,
+  GetTodoDayDetailParams,
   GymExercise,
   GymExerciseInput,
   GymExerciseUpdate,
@@ -59,6 +61,8 @@ import type {
   SubprojectInput,
   SubprojectUpdate,
   TodoCalendarSummaryItem,
+  TodoDayDetailTask,
+  TodoDayDetailToggleInput,
   TodoList,
   TodoListInput,
   TodoListUpdate,
@@ -2024,6 +2028,76 @@ export const useDeleteTodoList = <TError = ErrorType<void>,
       return useMutation(getDeleteTodoListMutationOptions(options));
     }
 
+export const getClearCompletedTodoTasksUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-lists/${id}/clear-completed`
+}
+
+/**
+ * @summary Soft-clear (hide) all currently-completed tasks in a list
+ */
+export const clearCompletedTodoTasks = async (id: number, options?: RequestInit): Promise<ClearCompletedTodoTasks200> => {
+
+  return customFetch<ClearCompletedTodoTasks200>(getClearCompletedTodoTasksUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getClearCompletedTodoTasksMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearCompletedTodoTasks>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof clearCompletedTodoTasks>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['clearCompletedTodoTasks'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof clearCompletedTodoTasks>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  clearCompletedTodoTasks(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ClearCompletedTodoTasksMutationResult = NonNullable<Awaited<ReturnType<typeof clearCompletedTodoTasks>>>
+
+    export type ClearCompletedTodoTasksMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Soft-clear (hide) all currently-completed tasks in a list
+ */
+export const useClearCompletedTodoTasks = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof clearCompletedTodoTasks>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof clearCompletedTodoTasks>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getClearCompletedTodoTasksMutationOptions(options));
+    }
+
 export const getListTodoTasksUrl = (params?: ListTodoTasksParams,) => {
   const normalizedParams = new URLSearchParams();
 
@@ -2261,6 +2335,160 @@ export function useGetTodoCalendarSummary<TData = Awaited<ReturnType<typeof getT
 
 
 
+
+export const getGetTodoDayDetailUrl = (params: GetTodoDayDetailParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/todo-tasks/day-detail?${stringifiedParams}` : `/api/todo-tasks/day-detail`
+}
+
+/**
+ * @summary Reconstructed task list + completion state for a list on a specific date
+ */
+export const getTodoDayDetail = async (params: GetTodoDayDetailParams, options?: RequestInit): Promise<TodoDayDetailTask[]> => {
+
+  return customFetch<TodoDayDetailTask[]>(getGetTodoDayDetailUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTodoDayDetailQueryKey = (params?: GetTodoDayDetailParams,) => {
+    return [
+    `/api/todo-tasks/day-detail`, ...(params ? [params] : [])
+    ] as const;
+    }
+
+
+export const getGetTodoDayDetailQueryOptions = <TData = Awaited<ReturnType<typeof getTodoDayDetail>>, TError = ErrorType<unknown>>(params: GetTodoDayDetailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodoDayDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTodoDayDetailQueryKey(params);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodoDayDetail>>> = ({ signal }) => getTodoDayDetail(params, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodoDayDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTodoDayDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getTodoDayDetail>>>
+export type GetTodoDayDetailQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Reconstructed task list + completion state for a list on a specific date
+ */
+
+export function useGetTodoDayDetail<TData = Awaited<ReturnType<typeof getTodoDayDetail>>, TError = ErrorType<unknown>>(
+ params: GetTodoDayDetailParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodoDayDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTodoDayDetailQueryOptions(params,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getToggleTodoDayDetailTaskUrl = () => {
+
+
+
+
+  return `/api/todo-tasks/day-detail/toggle`
+}
+
+/**
+ * @summary Toggle a task's completion for a specific (typically past) date
+ */
+export const toggleTodoDayDetailTask = async (todoDayDetailToggleInput: TodoDayDetailToggleInput, options?: RequestInit): Promise<TodoDayDetailTask> => {
+
+  return customFetch<TodoDayDetailTask>(getToggleTodoDayDetailTaskUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoDayDetailToggleInput)
+  }
+);}
+
+
+
+
+export const getToggleTodoDayDetailTaskMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleTodoDayDetailTask>>, TError,{data: BodyType<TodoDayDetailToggleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof toggleTodoDayDetailTask>>, TError,{data: BodyType<TodoDayDetailToggleInput>}, TContext> => {
+
+const mutationKey = ['toggleTodoDayDetailTask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof toggleTodoDayDetailTask>>, {data: BodyType<TodoDayDetailToggleInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  toggleTodoDayDetailTask(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ToggleTodoDayDetailTaskMutationResult = NonNullable<Awaited<ReturnType<typeof toggleTodoDayDetailTask>>>
+    export type ToggleTodoDayDetailTaskMutationBody = BodyType<TodoDayDetailToggleInput>
+    export type ToggleTodoDayDetailTaskMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Toggle a task's completion for a specific (typically past) date
+ */
+export const useToggleTodoDayDetailTask = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof toggleTodoDayDetailTask>>, TError,{data: BodyType<TodoDayDetailToggleInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof toggleTodoDayDetailTask>>,
+        TError,
+        {data: BodyType<TodoDayDetailToggleInput>},
+        TContext
+      > => {
+      return useMutation(getToggleTodoDayDetailTaskMutationOptions(options));
+    }
 
 export const getUpdateTodoTaskUrl = (id: number,) => {
 

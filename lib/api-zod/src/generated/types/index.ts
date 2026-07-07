@@ -6,11 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './clearCompletedTodoTasks200';
 export * from './daySummary';
 export * from './getCalendarParams';
 export * from './getRecentSessionsParams';
 export * from './getSubprojectCalendarEventsParams';
 export * from './getTodoCalendarSummaryParams';
+export * from './getTodoDayDetailParams';
 export * from './gymExercise';
 export * from './gymExerciseCategory';
 export * from './gymExerciseInput';
@@ -47,6 +49,8 @@ export * from './subprojectCalendarEvent';
 export * from './subprojectInput';
 export * from './subprojectUpdate';
 export * from './todoCalendarSummaryItem';
+export * from './todoDayDetailTask';
+export * from './todoDayDetailToggleInput';
 export * from './todoList';
 export * from './todoListInput';
 export * from './todoListUpdate';

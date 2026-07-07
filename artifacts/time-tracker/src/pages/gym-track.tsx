@@ -25,7 +25,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGr
 import { Plus, Trash2, Pencil, Check, X, Dumbbell, ListChecks, Trophy, Footprints, Save, LineChart as LineChartIcon } from "lucide-react"
 import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts"
 import { cn } from "@/lib/utils"
-import { CATEGORIES, categoryColor, formatPace } from "@/lib/gym-utils"
+import { CATEGORIES, categoryColor, formatPace, formatSpeed, sanitizeNumericInput } from "@/lib/gym-utils"
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -279,9 +279,9 @@ function SetInput({
       {editing ? (
         <div className="flex items-center gap-1">
           <input
-            type="number" inputMode="numeric" step="1"
+            type="text" inputMode="numeric"
             value={repsText}
-            onChange={e => setRepsText(e.target.value)}
+            onChange={e => setRepsText(sanitizeNumericInput(e.target.value, false))}
             onBlur={commit}
             onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
             placeholder="reps"
@@ -289,9 +289,9 @@ function SetInput({
           />
           <span className="text-[10px] leading-none text-muted-foreground shrink-0">x</span>
           <input
-            type="number" inputMode="decimal" step="0.05"
+            type="text" inputMode="decimal"
             value={weightText}
-            onChange={e => setWeightText(e.target.value)}
+            onChange={e => setWeightText(sanitizeNumericInput(e.target.value, true))}
             onBlur={commit}
             onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
             placeholder="kg"
@@ -677,11 +677,21 @@ function RunFormDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Distance (km)</label>
-              <Input type="number" step="0.01" value={distance} onChange={e => setDistance(e.target.value)} placeholder="5.2" />
+              <Input
+                type="text" inputMode="decimal"
+                value={distance}
+                onChange={e => setDistance(sanitizeNumericInput(e.target.value, true))}
+                placeholder="5.2"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-xs text-muted-foreground">Time (min)</label>
-              <Input type="number" step="1" value={duration} onChange={e => setDuration(e.target.value)} placeholder="32" />
+              <Input
+                type="text" inputMode="numeric"
+                value={duration}
+                onChange={e => setDuration(sanitizeNumericInput(e.target.value, false))}
+                placeholder="32"
+              />
             </div>
           </div>
         </div>
@@ -708,6 +718,9 @@ function RunCard({
   const pace = run.distanceKm != null && run.durationMinutes != null
     ? formatPace(run.distanceKm, run.durationMinutes)
     : null
+  const speed = run.distanceKm != null && run.durationMinutes != null
+    ? formatSpeed(run.distanceKm, run.durationMinutes)
+    : null
 
   return (
     <div className="bg-card border rounded-2xl shadow-sm overflow-hidden group">
@@ -727,6 +740,9 @@ function RunCard({
         )}
         {run.durationMinutes != null && (
           <span className="text-sm text-muted-foreground tabular-nums">{run.durationMinutes} min</span>
+        )}
+        {speed && (
+          <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{speed}</span>
         )}
         {pace && (
           <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{pace}</span>

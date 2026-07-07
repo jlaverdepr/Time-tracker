@@ -13,4 +13,8 @@ export interface TodoTaskUpdate {
   projectId?: number | null;
   /** @nullable */
   subprojectId?: number | null;
+  /** @nullable */
+  scheduledDate?: string | null;
+  /** @nullable */
+  reminderTime?: string | null;
 }

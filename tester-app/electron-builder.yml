@@ -1,0 +1,30 @@
+appId: com.focustime.tester
+productName: FocusTime Tester
+directories:
+  output: dist
+afterPack: build/after-pack.cjs
+files:
+  - dist-main/**/*
+  - package.json
+asarUnpack:
+  - "**/*.node"
+extraResources:
+  - from: ../lib/db/drizzle
+    to: drizzle
+  - from: ../artifacts/time-tracker/dist/public
+    to: public
+  - from: build/tray-icon.png
+    to: tray-icon.png
+mac:
+  icon: build/icon.icns
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.productivity
+win:
+  icon: build/icon.png
+  target:
+    - target: portable
+      arch:
+        - x64

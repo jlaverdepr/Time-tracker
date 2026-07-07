@@ -382,6 +382,40 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  tester-app:
+    dependencies:
+      better-sqlite3:
+        specifier: ^12.2.0
+        version: 12.11.1
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      '@workspace/api-server':
+        specifier: workspace:*
+        version: link:../artifacts/api-server
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../lib/db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)
+      electron:
+        specifier: ^33.2.0
+        version: 33.4.11
+      electron-builder:
+        specifier: ^25.1.8
+        version: 25.1.8
+      esbuild:
+        specifier: 0.27.3
+        version: 0.27.3
+      express:
+        specifier: ^5.2.1
+        version: 5.2.1
+
 packages:
 
   7zip-bin@5.2.0:

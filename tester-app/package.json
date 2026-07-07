@@ -1,0 +1,27 @@
+{
+  "name": "tester-app",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist-main/main.js",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:frontend": "pnpm --filter @workspace/time-tracker run build",
+    "build:main": "node build/build-main.mjs",
+    "build:mac": "pnpm run build:frontend && pnpm run build:main && electron-builder --config electron-builder.yml --mac",
+    "build:win": "pnpm run build:frontend && pnpm run build:main && electron-builder --config electron-builder.yml --win"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
+    "@workspace/api-server": "workspace:*",
+    "@workspace/db": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "esbuild": "0.27.3",
+    "express": "^5.2.1"
+  }
+}

@@ -38,6 +38,7 @@ packages:
   - artifacts/*
   - lib/*
   - desktop
+  - tester-app
 
 catalog:
   '@replit/vite-plugin-cartographer': ^0.5.21

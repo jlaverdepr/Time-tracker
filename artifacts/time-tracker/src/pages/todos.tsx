@@ -228,7 +228,7 @@ function TaskItem({
 
       {/* project / subproject assignment row */}
       {!editing && !done && projects.length > 0 && (
-        <div className="flex items-center gap-1.5 ml-6">
+        <div className="flex items-center gap-1.5 ml-6 min-w-0">
           {assignedProject ? (
             <>
               <span className="h-2 w-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: assignedProject.color }} />
@@ -236,7 +236,7 @@ function TaskItem({
                 value={task.projectId ?? ""}
                 onChange={handleProjectChange}
                 onClick={e => e.stopPropagation()}
-                className="text-xs bg-transparent border-none focus:outline-none cursor-pointer font-medium leading-none p-0 max-w-[180px] truncate"
+                className="text-xs bg-transparent border-none focus:outline-none cursor-pointer font-medium leading-none p-0 min-w-0 max-w-[180px] truncate"
                 style={{ color: assignedProject.color }}
               >
                 <option value="">— remove</option>
@@ -246,12 +246,12 @@ function TaskItem({
               </select>
               {subsForProject.length > 0 && (
                 <>
-                  <span className="text-muted-foreground/40 text-xs">·</span>
+                  <span className="text-muted-foreground/40 text-xs shrink-0">·</span>
                   <select
                     value={task.subprojectId ?? ""}
                     onChange={handleSubprojectChange}
                     onClick={e => e.stopPropagation()}
-                    className="text-xs bg-transparent border-none focus:outline-none cursor-pointer text-muted-foreground leading-none p-0 max-w-[160px] truncate"
+                    className="text-xs bg-transparent border-none focus:outline-none cursor-pointer text-muted-foreground leading-none p-0 min-w-0 max-w-[160px] truncate"
                   >
                     <option value="">no subproject</option>
                     {subsForProject.map(s => (
@@ -284,36 +284,38 @@ function TaskItem({
 
 const LIST_HEIGHT_MIN = 120
 const LIST_HEIGHT_MAX = 900
-const LIST_HEIGHT_DEFAULT = 420
 
+// Lists auto-fit their height to content (grows/shrinks as tasks are added,
+// completed, or cleared) until the user manually drags the resize handle —
+// at that point we switch to a fixed, scrollable height and remember it.
 function useResizableHeight(storageKey: string) {
-  const [height, setHeight] = React.useState<number>(() => {
-    if (typeof window === "undefined") return LIST_HEIGHT_DEFAULT
+  const [manualHeight, setManualHeight] = React.useState<number | null>(() => {
+    if (typeof window === "undefined") return null
     const saved = Number(window.localStorage.getItem(storageKey))
-    return Number.isFinite(saved) && saved > 0 ? saved : LIST_HEIGHT_DEFAULT
+    return Number.isFinite(saved) && saved > 0 ? saved : null
   })
-  const heightRef = React.useRef(height)
-  heightRef.current = height
+  const heightRef = React.useRef(manualHeight)
+  heightRef.current = manualHeight
 
-  const handleMouseDown = React.useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = React.useCallback((e: React.MouseEvent, currentHeight: number) => {
     e.preventDefault()
     const startY = e.clientY
-    const startHeight = heightRef.current
+    const startHeight = heightRef.current ?? currentHeight
 
     function onMouseMove(ev: MouseEvent) {
       const next = Math.min(LIST_HEIGHT_MAX, Math.max(LIST_HEIGHT_MIN, startHeight + (ev.clientY - startY)))
-      setHeight(next)
+      setManualHeight(next)
     }
     function onMouseUp() {
       window.removeEventListener("mousemove", onMouseMove)
       window.removeEventListener("mouseup", onMouseUp)
-      window.localStorage.setItem(storageKey, String(heightRef.current))
+      if (heightRef.current != null) window.localStorage.setItem(storageKey, String(heightRef.current))
     }
     window.addEventListener("mousemove", onMouseMove)
     window.addEventListener("mouseup", onMouseUp)
   }, [storageKey])
 
-  return { height, handleMouseDown }
+  return { manualHeight, handleMouseDown }
 }
 
 function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
@@ -371,7 +373,8 @@ function ListCard({
 }) {
   const [newText, setNewText] = React.useState("")
   const inputRef = React.useRef<HTMLInputElement>(null)
-  const { height, handleMouseDown } = useResizableHeight(`todo-list-height-${list.id}`)
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  const { manualHeight, handleMouseDown } = useResizableHeight(`todo-list-height-${list.id}`)
   const pct = completionRate(tasks, list.resetDaily)
   const doneTasks = tasks.filter(t => isTaskComplete(t, list.resetDaily))
   const activeTasks = tasks.filter(t => !isTaskComplete(t, list.resetDaily))
@@ -446,8 +449,12 @@ function ListCard({
         )}
       </form>
 
-      {/* task list */}
-      <div className="overflow-y-auto p-3 space-y-1.5" style={{ height }}>
+      {/* task list — auto-fits to content until manually resized */}
+      <div
+        ref={contentRef}
+        className={cn("p-3 space-y-1.5", manualHeight != null && "overflow-y-auto")}
+        style={manualHeight != null ? { height: manualHeight } : undefined}
+      >
         {tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/30 gap-2">
             <ListChecks className="h-7 w-7" />
@@ -487,7 +494,7 @@ function ListCard({
         )}
       </div>
 
-      <ResizeHandle onMouseDown={handleMouseDown} />
+      <ResizeHandle onMouseDown={e => handleMouseDown(e, contentRef.current?.offsetHeight ?? LIST_HEIGHT_MIN)} />
     </div>
   )
 }

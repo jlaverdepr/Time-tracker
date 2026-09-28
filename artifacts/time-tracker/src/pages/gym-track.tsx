@@ -86,7 +86,7 @@ function ExerciseRow({
         </span>
       )}
       {!editing && (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
           <button onClick={() => { setEditValue(exercise.name); setEditing(true) }}
             className="p-1 rounded hover:bg-muted transition-colors">
             <Pencil className="h-3 w-3 text-muted-foreground" />
@@ -317,7 +317,7 @@ function SetInput({
             onBlur={commit}
             onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
             placeholder="reps"
-            className={cn(inputClass, "w-10")}
+            className={cn(inputClass, "w-10 pointer-coarse:h-9 pointer-coarse:w-12")}
           />
           <span className="text-[10px] leading-none text-muted-foreground shrink-0">x</span>
           <input
@@ -327,24 +327,25 @@ function SetInput({
             onBlur={commit}
             onKeyDown={handleWeightKeyDown}
             placeholder="kg"
-            className={cn(inputClass, "w-14")}
+            className={cn(inputClass, "w-14 pointer-coarse:h-9 pointer-coarse:w-16")}
           />
         </div>
       ) : (
         <div
           className={cn(
-            "h-7 px-2 flex items-center justify-center text-xs font-medium rounded-md border bg-background whitespace-nowrap",
+            "h-7 pointer-coarse:h-9 px-2 flex items-center justify-center text-xs pointer-coarse:text-sm font-medium rounded-md border bg-background whitespace-nowrap",
             set.failure && "border-red-500 text-red-600",
           )}
         >
           {set.reps} x {set.weight} kg
         </div>
       )}
-      <div className="absolute -top-1 -right-1 flex items-center gap-0.5 opacity-0 group-hover/slot:opacity-100 transition-opacity">
+      {/* Mouse: small badges on the set's corner, shown on hover. Touch: a finger-sized row under the set. */}
+      <div className="absolute -top-1 -right-1 flex items-center gap-0.5 opacity-0 group-hover/slot:opacity-100 transition-opacity pointer-coarse:static pointer-coarse:opacity-100 pointer-coarse:gap-2 pointer-coarse:mt-1">
         {!editing && (
           <button type="button" onClick={() => setEditing(true)} title="Edit"
-            className="h-4 w-4 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20">
-            <Pencil className="h-2.5 w-2.5" />
+            className="h-4 w-4 pointer-coarse:h-7 pointer-coarse:w-7 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20">
+            <Pencil className="h-2.5 w-2.5 pointer-coarse:h-3.5 pointer-coarse:w-3.5" />
           </button>
         )}
         <button
@@ -352,7 +353,7 @@ function SetInput({
           onClick={() => onToggleFailure(set.id, !set.failure)}
           title={set.failure ? "Unmark failure" : "Mark as failure"}
           className={cn(
-            "h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold",
+            "h-4 w-4 pointer-coarse:h-7 pointer-coarse:w-7 rounded-full flex items-center justify-center text-[9px] pointer-coarse:text-xs font-bold",
             set.failure ? "bg-red-600 text-white opacity-100" : "bg-red-100 text-red-600 hover:bg-red-200",
           )}
         >
@@ -362,9 +363,9 @@ function SetInput({
           type="button"
           onClick={() => onDelete(set.id)}
           title="Delete set"
-          className="h-4 w-4 rounded-full bg-muted flex items-center justify-center hover:bg-destructive/10 hover:text-destructive"
+          className="h-4 w-4 pointer-coarse:h-7 pointer-coarse:w-7 rounded-full bg-muted flex items-center justify-center hover:bg-destructive/10 hover:text-destructive"
         >
-          <Trash2 className="h-2.5 w-2.5" />
+          <Trash2 className="h-2.5 w-2.5 pointer-coarse:h-3.5 pointer-coarse:w-3.5" />
         </button>
       </div>
     </div>
@@ -426,7 +427,7 @@ function SetGroup({
   }
 
   return (
-    <div className="flex items-end gap-1.5 justify-end">
+    <div className="flex flex-wrap items-start md:items-end gap-1.5 pointer-coarse:gap-2.5 justify-start md:justify-end">
       {sorted.map((s, i) => (
         <SetInput
           key={s.id} set={s} index={i + 1}
@@ -438,7 +439,7 @@ function SetGroup({
         <button
           type="button"
           onClick={() => onCreateSet(entryId, isWarmup, sorted.length + 1)}
-          className="h-7 px-2 rounded-md border border-dashed text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1 shrink-0"
+          className="h-7 pointer-coarse:h-9 mt-3 md:mt-0 px-2 rounded-md border border-dashed text-[10px] pointer-coarse:text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1 shrink-0"
         >
           <Plus className="h-3 w-3" />
           Add Set
@@ -481,11 +482,11 @@ function WorkoutEntryRow({
   }
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-card group">
+    <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2 px-3 py-2.5 rounded-xl border bg-card group">
       <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(exercise?.category ?? "Minor") }} />
 
-      <div className="w-44 shrink-0 flex flex-col justify-center gap-0.5">
-        <div className="text-sm font-medium truncate">{exercise?.name ?? "Unknown exercise"}</div>
+      <div className="flex-1 md:flex-none md:w-44 min-w-0 md:shrink-0 flex flex-col justify-center gap-0.5">
+        <div className="text-sm font-medium md:truncate">{exercise?.name ?? "Unknown exercise"}</div>
         {!warmupOpen && (
           <button
             onClick={handleAddOrEditWarmup}
@@ -496,11 +497,11 @@ function WorkoutEntryRow({
         )}
       </div>
 
-      <div className="flex-1 flex flex-col justify-center gap-1.5 min-w-0">
+      <div className="order-last md:order-none w-full md:w-auto md:flex-1 flex flex-col justify-center gap-1.5 min-w-0">
         <SetGroup sets={mainSets} isWarmup={false} entryId={entry.id}
           onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
         {warmupOpen ? (
-          <div className="flex items-end gap-2 justify-end">
+          <div className="flex flex-wrap items-end gap-2 justify-start md:justify-end">
             <span className="text-[10px] text-muted-foreground shrink-0 pb-1.5">Warmup</span>
             <SetGroup sets={warmupSets} isWarmup={true} entryId={entry.id}
               onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
@@ -509,14 +510,14 @@ function WorkoutEntryRow({
             </button>
           </div>
         ) : filledWarmupSets.length > 0 ? (
-          <div className="text-xs text-muted-foreground text-right">
+          <div className="text-xs text-muted-foreground md:text-right">
             Warmup: {filledWarmupSets.map(s => `${s.reps} x ${s.weight} kg`).join(", ")}
           </div>
         ) : null}
       </div>
 
       <button onClick={() => onDelete(entry.id)}
-        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0">
+        className="p-1 pointer-coarse:p-2 md:order-last rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0">
         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
     </div>
@@ -648,30 +649,33 @@ function WorkoutCard({
               <div className="flex items-center gap-2">
                 <span className="font-bold text-base truncate">{workout.title}</span>
                 <button onClick={() => setEditingDetails(true)}
-                  className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover/hdr:opacity-100 shrink-0" title="Edit details">
+                  className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover/hdr:opacity-100 pointer-coarse:opacity-100 shrink-0" title="Edit details">
                   <Pencil className="h-3 w-3 text-muted-foreground" />
                 </button>
               </div>
               <span className="text-[11px] text-muted-foreground">{dateLabel}</span>
+              <div className="md:hidden text-[11px] text-muted-foreground tabular-nums">
+                {entries.length} exercise{entries.length === 1 ? "" : "s"}{volume > 0 && ` · ${volume.toLocaleString("en-US")} kg total`}
+              </div>
             </>
           ) : (
             <div className="flex items-center gap-2">
               <span className="font-semibold text-sm truncate">{dateLabel}</span>
               <button onClick={() => setEditingDetails(true)}
-                className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover/hdr:opacity-100 shrink-0" title="Edit details">
+                className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover/hdr:opacity-100 pointer-coarse:opacity-100 shrink-0" title="Edit details">
                 <Pencil className="h-3 w-3 text-muted-foreground" />
               </button>
             </div>
           )}
         </div>
         {volume > 0 && (
-          <span className="text-xs font-medium text-muted-foreground shrink-0 tabular-nums">
+          <span className="hidden md:inline text-xs font-medium text-muted-foreground shrink-0 tabular-nums">
             {volume.toLocaleString('en-US')} kg total
           </span>
         )}
-        <span className="text-xs text-muted-foreground shrink-0">{entries.length} exercise{entries.length === 1 ? "" : "s"}</span>
+        <span className="hidden md:inline text-xs text-muted-foreground shrink-0">{entries.length} exercise{entries.length === 1 ? "" : "s"}</span>
         <button onClick={() => onDeleteWorkout(workout.id)}
-          className="p-1 rounded hover:bg-destructive/10 transition-colors opacity-0 group-hover/hdr:opacity-100 shrink-0" title="Delete workout">
+          className="p-1 rounded hover:bg-destructive/10 transition-colors opacity-0 group-hover/hdr:opacity-100 pointer-coarse:opacity-100 shrink-0" title="Delete workout">
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </div>
@@ -824,31 +828,33 @@ function RunCard({
 
   return (
     <div className="bg-card border rounded-2xl shadow-sm overflow-hidden group">
-      <div className="px-4 py-3 flex items-center gap-2.5">
+      <div className="px-4 py-3 flex flex-wrap md:flex-nowrap items-center gap-x-2.5 gap-y-2">
         <div className="h-6 w-6 rounded-full bg-sky-500 flex items-center justify-center shrink-0">
           <Footprints className="h-3.5 w-3.5 text-white" />
         </div>
         <div className="flex-1 min-w-0 flex items-center gap-2">
           <span className="font-semibold text-sm truncate">{dateLabel}</span>
           <button onClick={() => setEditing(true)}
-            className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Edit run">
+            className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0" title="Edit run">
             <Pencil className="h-3 w-3 text-muted-foreground" />
           </button>
         </div>
-        {run.distanceKm != null && (
-          <span className="text-sm font-medium tabular-nums text-sky-600">{run.distanceKm} km</span>
-        )}
-        {run.durationSeconds != null && (
-          <span className="text-sm text-muted-foreground tabular-nums">{formatRunTime(run.durationSeconds)}</span>
-        )}
-        {speed && (
-          <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{speed}</span>
-        )}
-        {pace && (
-          <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{pace}</span>
-        )}
+        <div className="order-last md:order-none w-full md:w-auto pl-8 md:pl-0 flex flex-wrap items-center gap-2.5">
+          {run.distanceKm != null && (
+            <span className="text-sm font-medium tabular-nums text-sky-600 whitespace-nowrap">{run.distanceKm} km</span>
+          )}
+          {run.durationSeconds != null && (
+            <span className="text-sm text-muted-foreground tabular-nums">{formatRunTime(run.durationSeconds)}</span>
+          )}
+          {speed && (
+            <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap bg-sky-500/10 px-1.5 py-0.5 rounded">{speed}</span>
+          )}
+          {pace && (
+            <span className="text-xs text-muted-foreground tabular-nums whitespace-nowrap bg-sky-500/10 px-1.5 py-0.5 rounded">{pace}</span>
+          )}
+        </div>
         <button onClick={() => onDelete(run.id)}
-          className="p-1 rounded hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Delete run">
+          className="p-1 pointer-coarse:p-2 rounded hover:bg-destructive/10 transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0" title="Delete run">
           <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
         </button>
       </div>
@@ -1089,14 +1095,14 @@ function LogWorkoutTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">Log a workout or a run.</p>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setAddRunOpen(true)} className="gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="hidden sm:block text-sm text-muted-foreground">Log a workout or a run.</p>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Button variant="outline" onClick={() => setAddRunOpen(true)} className="gap-2 flex-1 sm:flex-none">
             <Footprints className="h-4 w-4" />
             Add Run
           </Button>
-          <Button onClick={openAddWorkout} className="gap-2">
+          <Button onClick={openAddWorkout} className="gap-2 flex-1 sm:flex-none">
             <Plus className="h-4 w-4" />
             Add Workout
           </Button>
@@ -1236,7 +1242,7 @@ function LogWorkoutTab() {
                       <span className="text-xs text-muted-foreground">{t.exerciseIds.length} exercise{t.exerciseIds.length === 1 ? "" : "s"}</span>
                     </button>
                     <button onClick={() => handleDeleteTemplate(t.id)}
-                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0">
+                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0">
                       <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                   </div>
@@ -1260,7 +1266,7 @@ function LogWorkoutTab() {
                       <span className="text-xs text-muted-foreground">{t.exerciseIds.length} exercise{t.exerciseIds.length === 1 ? "" : "s"}</span>
                     </button>
                     <button onClick={() => handleDeleteTemplate(t.id)}
-                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 shrink-0">
+                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0">
                       <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                     </button>
                   </div>
@@ -1392,11 +1398,11 @@ function WeightLogRow({ log, onUpdate, onDelete }: {
       <span className="text-sm font-medium flex-1">{format(parseISO(log.date), "EEE, MMM d, yyyy")}</span>
       <span className="text-sm font-semibold tabular-nums">{log.weightKg} kg</span>
       <button onClick={() => setEditing(true)} title="Edit"
-        className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity">
+        className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity">
         <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
       <button onClick={() => onDelete(log.id)} title="Delete"
-        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity">
         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
     </div>
@@ -1794,18 +1800,18 @@ function PersonalRecordsTab() {
 export default function GymTrack() {
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-6 md:p-8 w-full max-w-[1600px] mx-auto">
+      <div className="flex flex-col gap-6 p-4 md:p-8 w-full max-w-[1600px] mx-auto">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Gym Track</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Gym Track</h1>
           <p className="text-muted-foreground">Track your exercises and log your workouts.</p>
         </div>
 
         <Tabs defaultValue="log">
-          <TabsList>
-            <TabsTrigger value="log">Log Workout</TabsTrigger>
+          <TabsList className="w-full md:w-auto grid grid-cols-4 md:inline-flex">
+            <TabsTrigger value="log"><span className="md:hidden">Log</span><span className="hidden md:inline">Log Workout</span></TabsTrigger>
             <TabsTrigger value="exercises">Exercises</TabsTrigger>
-            <TabsTrigger value="records">Personal Records</TabsTrigger>
-            <TabsTrigger value="weight">Weight Tracker</TabsTrigger>
+            <TabsTrigger value="records"><span className="md:hidden">Records</span><span className="hidden md:inline">Personal Records</span></TabsTrigger>
+            <TabsTrigger value="weight"><span className="md:hidden">Weight</span><span className="hidden md:inline">Weight Tracker</span></TabsTrigger>
           </TabsList>
           <TabsContent value="log">
             <LogWorkoutTab />

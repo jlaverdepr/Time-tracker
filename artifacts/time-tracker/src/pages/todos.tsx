@@ -164,7 +164,7 @@ function TaskItem({
             }}
             onDragEnd={onDragEndTask}
             title="Drag to reorder or move to another list"
-            className="shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity -ml-1"
+            className="shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity -ml-1 pointer-coarse:hidden"
           >
             <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40" />
           </span>
@@ -218,7 +218,7 @@ function TaskItem({
         )}
 
         {!editing && !done && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
             <button onClick={() => { setReminderValue(task.reminderTime ?? ""); setEditingReminder(v => !v) }}
               className="p-1 rounded hover:bg-muted transition-colors" title="Set reminder">
               {task.reminderTime
@@ -236,7 +236,7 @@ function TaskItem({
           </div>
         )}
         {!editing && done && (
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
             <button onClick={() => onDelete(task.id)}
               className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors">
               <Trash2 className="h-2.5 w-2.5 text-muted-foreground" />
@@ -264,9 +264,10 @@ function TaskItem({
         </div>
       )}
 
-      {/* project / subproject assignment row */}
-      {!editing && !done && projects.length > 0 && (
-        <div className="flex items-center gap-1.5 ml-6 min-w-0">
+      {/* project / subproject assignment row. Touch screens show the empty
+          "+ assign project" picker only while editing, to keep rows compact. */}
+      {!done && projects.length > 0 && (
+        <div className={cn("flex items-center gap-1.5 ml-6 min-w-0", !assignedProject && !editing && "pointer-coarse:hidden")}>
           {assignedProject ? (
             <>
               <span className="h-2 w-2 rounded-full shrink-0 inline-block" style={{ backgroundColor: assignedProject.color }} />
@@ -304,7 +305,7 @@ function TaskItem({
               value=""
               onChange={handleProjectChange}
               onClick={e => e.stopPropagation()}
-              className="text-xs text-muted-foreground/30 bg-transparent border-none focus:outline-none cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity leading-none p-0"
+              className="text-xs text-muted-foreground/30 bg-transparent border-none focus:outline-none cursor-pointer opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity leading-none p-0"
             >
               <option value="">+ assign project</option>
               {projects.filter(p => p.status === "active").map(p => (
@@ -525,7 +526,7 @@ function ListCard({
         style={{ borderLeftColor: list.color, borderLeftWidth: 4 }}
       >
         {celebrate && <ConfettiBurst onDone={() => setCelebrate(false)} />}
-        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0 -ml-1" />
+        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0 -ml-1 pointer-coarse:hidden" />
         <div className={cn(
           "relative w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-xs shrink-0 transition-all",
           complete && "ring-2 ring-amber-400 ring-offset-1 ring-offset-card",
@@ -544,7 +545,7 @@ function ListCard({
         </div>
         <ProgressRing pct={pct} color={complete ? "#f59e0b" : list.color} size={28} />
         <span className="font-mono text-xs font-bold w-8 text-right shrink-0" style={{ color: complete ? "#f59e0b" : list.color }}>{pct}%</span>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0">
+        <div className="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
           <button onClick={() => onEditList(list)}
             className="p-1 rounded hover:bg-muted transition-colors" title="Edit list">
             <Pencil className="h-3 w-3 text-muted-foreground" />
@@ -641,7 +642,7 @@ function ListCard({
                   <button
                     onClick={() => onClearCompleted(list.id)}
                     title="Clear completed tasks"
-                    className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover/done:opacity-100"
+                    className="p-0.5 rounded hover:bg-muted transition-colors opacity-0 group-hover/done:opacity-100 pointer-coarse:opacity-100"
                   >
                     <Eraser className="h-3 w-3 text-muted-foreground" />
                   </button>
@@ -918,11 +919,11 @@ export default function Todos() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-6 md:p-8 w-full max-w-[1600px] mx-auto">
+      <div className="flex flex-col gap-6 p-4 md:p-8 w-full max-w-[1600px] mx-auto">
         {/* header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">To Do</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">To Do</h1>
             <p className="text-muted-foreground">All your lists at a glance.</p>
           </div>
           <Button onClick={openAddList} className="gap-2">

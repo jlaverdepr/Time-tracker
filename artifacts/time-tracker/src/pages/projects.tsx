@@ -115,7 +115,7 @@ function SubprojectRow({
         </div>
       )}
 
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
         {!done ? (
           <>
             <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
@@ -402,10 +402,10 @@ export default function Projects() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-8 max-w-5xl mx-auto w-full">
+      <div className="flex flex-col gap-6 p-4 md:p-8 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Projects</h1>
             <p className="text-muted-foreground">Manage projects and their subprojects.</p>
           </div>
           <Button onClick={openCreateProject} className="gap-2">
@@ -469,7 +469,7 @@ export default function Projects() {
                         </div>
                       )}
 
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
                         {!isDone ? (
                           <Button variant="ghost" size="icon" className="h-7 w-7 text-emerald-600 hover:bg-emerald-50"
                             title="Complete project" onClick={() => handleCompleteProject(project.id)}>

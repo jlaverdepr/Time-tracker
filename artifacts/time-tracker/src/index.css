@@ -141,6 +141,14 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* iOS Safari zooms the page when focusing a field with text under 16px. */
+  @media (pointer: coarse) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   }
 }
 

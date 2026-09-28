@@ -188,7 +188,7 @@ function TodoDayPanel({ list, stats, date }: {
                 <button
                   onClick={e => handleDelete(e, task.id)}
                   title="Delete task"
-                  className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover/task:opacity-100 shrink-0"
+                  className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover/task:opacity-100 pointer-coarse:opacity-100 shrink-0"
                 >
                   <Trash2 className="h-3 w-3 text-muted-foreground" />
                 </button>
@@ -416,17 +416,17 @@ export default function Calendar() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-8 max-w-5xl mx-auto w-full">
-        <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-6 p-4 md:p-8 max-w-5xl mx-auto w-full">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Calendar</h1>
-            <p className="text-muted-foreground">Your work mapped out over time.</p>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Calendar</h1>
+            <p className="hidden md:block text-muted-foreground">Your work mapped out over time.</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between md:justify-start gap-4">
             <Button variant="outline" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-lg font-semibold w-32 text-center">
+            <span className="text-lg font-semibold md:w-32 text-center whitespace-nowrap">
               {format(currentMonth, "MMMM yyyy")}
             </span>
             <Button variant="outline" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
@@ -482,10 +482,12 @@ export default function Calendar() {
           )}
         </div>
 
-        <div className="bg-card rounded-xl border p-6 shadow-sm">
-          <div className="grid grid-cols-7 gap-2 mb-4">
+        <div className="bg-card rounded-xl border p-2 md:p-6 shadow-sm">
+          <div className="grid grid-cols-7 gap-1 md:gap-2 mb-2 md:mb-4">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => (
-              <div key={d} className="text-center text-sm font-semibold text-muted-foreground pb-2">{d}</div>
+              <div key={d} className="text-center text-xs md:text-sm font-semibold text-muted-foreground pb-1 md:pb-2">
+                <span className="md:hidden">{d[0]}</span><span className="hidden md:inline">{d}</span>
+              </div>
             ))}
           </div>
 
@@ -494,9 +496,9 @@ export default function Calendar() {
               Loading calendar...
             </div>
           ) : (
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 md:gap-2">
               {emptyDays.map((_, i) => (
-                <div key={`empty-${i}`} className="h-28 rounded-xl opacity-0 pointer-events-none" />
+                <div key={`empty-${i}`} className="h-16 md:h-28 rounded-xl opacity-0 pointer-events-none" />
               ))}
 
               {days.map(day => {
@@ -514,7 +516,7 @@ export default function Calendar() {
                     key={dStr}
                     onClick={() => setSelectedDate(dStr)}
                     className={cn(
-                      "h-28 rounded-xl p-2 flex flex-col justify-between transition-all relative overflow-hidden group hover:ring-2 hover:ring-primary hover:ring-offset-2 hover:ring-offset-background",
+                      "h-16 md:h-28 rounded-lg md:rounded-xl p-1 md:p-2 flex flex-col justify-between transition-all relative overflow-hidden group hover:ring-2 hover:ring-primary hover:ring-offset-2 hover:ring-offset-background",
                       getIntensityClass(minutes),
                       isToday(day) && "ring-2 ring-primary ring-offset-2 ring-offset-background",
                       minutes === 0 && "hover:bg-muted"
@@ -522,16 +524,27 @@ export default function Calendar() {
                   >
                     {/* day number */}
                     <span className={cn(
-                      "text-sm font-bold w-6 h-6 flex items-center justify-center rounded-full self-start",
+                      "text-xs md:text-sm font-bold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full self-start",
                       getTextClass(minutes)
                     )}>
                       {format(day, "d")}
                     </span>
 
+                    {/* phones: one compact row of dots instead of the stacked icons/badges */}
+                    <div className="md:hidden flex flex-wrap items-center justify-center gap-0.5">
+                      {visibleIcons.workout && gymDatesSet.has(dStr) && <span className="w-2 h-2 rounded-full bg-orange-500" />}
+                      {visibleIcons.run && runDatesSet.has(dStr) && <span className="w-2 h-2 rounded-full bg-sky-500" />}
+                      {visibleIcons.todoBadges && todoListsWithTasks.slice(0, 4).map(item => (
+                        <span key={item.listId}
+                          className={cn("w-2 h-2 rounded-[2px]", item.percentage === 100 && "ring-1 ring-amber-400")}
+                          style={{ backgroundColor: item.list.color, opacity: 0.35 + 0.65 * (item.percentage / 100) }} />
+                      ))}
+                    </div>
+
                     {/* workout indicator */}
                     {visibleIcons.workout && gymDatesSet.has(dStr) && (
                       <div
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center shadow-md z-10"
+                        className="hidden md:flex absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-orange-500 items-center justify-center shadow-md z-10"
                         title="Workout logged"
                       >
                         <Dumbbell className="h-3.5 w-3.5 text-white" />
@@ -542,7 +555,7 @@ export default function Calendar() {
                     {visibleIcons.run && runDatesSet.has(dStr) && (
                       <div
                         className={cn(
-                          "absolute top-1.5 w-6 h-6 rounded-full bg-sky-500 flex items-center justify-center shadow-md z-10",
+                          "hidden md:flex absolute top-1.5 w-6 h-6 rounded-full bg-sky-500 items-center justify-center shadow-md z-10",
                           visibleIcons.workout && gymDatesSet.has(dStr) ? "right-9" : "right-1.5",
                         )}
                         title="Run logged"
@@ -554,14 +567,14 @@ export default function Calendar() {
                     {/* prepared task indicator */}
                     {visibleIcons.prepared && hasPrepared && (
                       <div
-                        className="absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-indigo-500 flex items-center justify-center shadow-md z-10"
+                        className="hidden md:flex absolute bottom-1.5 left-1.5 w-5 h-5 rounded-full bg-indigo-500 items-center justify-center shadow-md z-10"
                         title="Task prepared in advance"
                       >
                         <CalendarPlus className="h-3 w-3 text-white" />
                       </div>
                     )}
 
-                    <div className="w-full space-y-1">
+                    <div className="hidden md:block w-full space-y-1">
                       {/* duration */}
                       {minutes > 0 && (
                         <div className="text-right">
@@ -628,8 +641,8 @@ export default function Calendar() {
 
       {/* ── Day detail sheet ── */}
       <Sheet open={!!selectedDate} onOpenChange={open => !open && setSelectedDate(null)}>
-        <SheetContent className="w-[400px] sm:w-[540px] flex flex-col p-0">
-          <div className="p-6 border-b bg-muted/30">
+        <SheetContent className="w-full sm:w-[540px] sm:max-w-[540px] flex flex-col p-0">
+          <div className="p-4 md:p-6 pt-[calc(1rem+env(safe-area-inset-top))] md:pt-6 border-b bg-muted/30">
             <SheetHeader>
               <SheetTitle>
                 {selectedDate ? format(parseISO(selectedDate), "EEEE, MMMM do, yyyy") : ""}
@@ -638,7 +651,7 @@ export default function Calendar() {
             </SheetHeader>
           </div>
 
-          <ScrollArea className="flex-1 p-6">
+          <ScrollArea className="flex-1 p-4 md:p-6">
             <div className="space-y-6">
 
               {/* todo lists — every list shows up here, with an inline "add a
@@ -799,7 +812,7 @@ export default function Calendar() {
                             <button
                               onClick={() => setSessionToEdit(session)}
                               title="Edit session"
-                              className="p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                              className="p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100"
                             >
                               <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                             </button>

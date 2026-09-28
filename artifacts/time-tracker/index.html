@@ -2,17 +2,26 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover" />
     <title>FocusTime</title>
-    <meta name="description" content="A simple local time tracker for projects, sessions, and to-dos." />
+    <meta name="description" content="Time tracking, to-dos and gym logging." />
     <meta name="robots" content="index, follow" />
     <meta property="og:title" content="FocusTime" />
-    <meta property="og:description" content="A simple local time tracker for projects, sessions, and to-dos." />
+    <meta property="og:description" content="Time tracking, to-dos and gym logging." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="FocusTime" />
-    <meta name="twitter:description" content="A simple local time tracker for projects, sessions, and to-dos." />
+    <meta name="twitter:description" content="Time tracking, to-dos and gym logging." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Installable on phones: Safari → Share → Add to Home Screen opens it full-screen with this icon -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="FocusTime" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="theme-color" content="#f7f6f3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#111a1e" media="(prefers-color-scheme: dark)" />
   </head>
   <body>
     <div id="root"></div>

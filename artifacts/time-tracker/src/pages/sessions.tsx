@@ -72,9 +72,9 @@ export default function Sessions() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-6 p-8 max-w-5xl mx-auto w-full h-full">
+      <div className="flex flex-col gap-6 p-4 md:p-8 max-w-5xl mx-auto w-full h-full">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Sessions Log</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight">Sessions Log</h1>
           <p className="text-muted-foreground">Every block of work you've recorded.</p>
         </div>
 
@@ -159,7 +159,7 @@ export default function Sessions() {
                         {session.notes || "-"}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity">
                           <Button
                             variant="ghost"
                             size="icon"

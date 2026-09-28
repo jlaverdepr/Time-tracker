@@ -47,14 +47,14 @@ export default function Dashboard() {
 
   return (
     <Layout>
-      <div className="flex flex-col gap-8 p-8 max-w-5xl mx-auto w-full">
+      <div className="flex flex-col gap-8 p-4 md:p-8 max-w-5xl mx-auto w-full">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">Overview</h1>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight mb-2">Overview</h1>
           <p className="text-muted-foreground">Here's how your time and tasks are looking.</p>
         </div>
 
         {/* time stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Today</CardTitle>

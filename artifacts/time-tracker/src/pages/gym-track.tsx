@@ -899,6 +899,7 @@ function LogWorkoutTab() {
   const [addWorkoutOpen, setAddWorkoutOpen] = React.useState(false)
   const [newWorkoutTitle, setNewWorkoutTitle] = React.useState<string>("Chest")
   const [newWorkoutCustomTitle, setNewWorkoutCustomTitle] = React.useState("")
+  const [newWorkoutDate, setNewWorkoutDate] = React.useState(todayStr())
   const [addRunOpen, setAddRunOpen] = React.useState(false)
   const [saveTemplateFor, setSaveTemplateFor] = React.useState<{ workout: GymWorkout; entries: GymWorkoutEntry[] } | null>(null)
   const [templateName, setTemplateName] = React.useState("")
@@ -1012,6 +1013,7 @@ function LogWorkoutTab() {
   function openAddWorkout() {
     setNewWorkoutTitle("Chest")
     setNewWorkoutCustomTitle("")
+    setNewWorkoutDate(todayStr())
     setAddWorkoutOpen(true)
   }
 
@@ -1031,13 +1033,13 @@ function LogWorkoutTab() {
   }, [templates, newWorkoutEffectiveTitle])
 
   function handleBlankWorkout(title: string) {
-    createWorkout.mutate({ data: { date: todayStr(), title: title || undefined } }, {
+    createWorkout.mutate({ data: { date: newWorkoutDate, title: title || undefined } }, {
       onSuccess: () => { invalidateWorkouts(); setAddWorkoutOpen(false); toast({ title: "Workout added" }) },
     })
   }
 
   function handleWorkoutFromTemplate(template: GymWorkoutTemplate) {
-    createWorkout.mutate({ data: { date: todayStr(), title: template.name } }, {
+    createWorkout.mutate({ data: { date: newWorkoutDate, title: template.name } }, {
       onSuccess: (workout) => {
         invalidateWorkouts()
         const ids = template.exerciseIds
@@ -1181,9 +1183,15 @@ function LogWorkoutTab() {
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
             <DialogTitle>New workout</DialogTitle>
-            <DialogDescription>Pick a title, then start blank or from a matching template.</DialogDescription>
+            <DialogDescription>Pick a title and date, then start blank or from a matching template.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
+            <Input
+              type="date"
+              aria-label="Workout date"
+              value={newWorkoutDate}
+              onChange={e => setNewWorkoutDate(e.target.value)}
+            />
             <div className="flex items-center gap-2">
               <Select value={newWorkoutTitle} onValueChange={setNewWorkoutTitle}>
                 <SelectTrigger className="h-9 flex-1">
@@ -1208,7 +1216,7 @@ function LogWorkoutTab() {
             </div>
 
             <Button variant="outline" onClick={() => handleBlankWorkout(newWorkoutEffectiveTitle)} className="justify-start"
-              disabled={newWorkoutTitle === "Other" && !newWorkoutCustomTitle.trim()}>
+              disabled={!newWorkoutDate || (newWorkoutTitle === "Other" && !newWorkoutCustomTitle.trim())}>
               Blank {newWorkoutEffectiveTitle || ""} workout
             </Button>
 
@@ -1221,6 +1229,7 @@ function LogWorkoutTab() {
                   <div key={t.id} className="flex items-center gap-2 group">
                     <button
                       onClick={() => handleWorkoutFromTemplate(t)}
+                      disabled={!newWorkoutDate}
                       className="flex-1 flex items-center justify-between px-3 py-2 rounded-lg border border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors text-left"
                     >
                       <span className="text-sm font-medium">{t.name}</span>
@@ -1244,6 +1253,7 @@ function LogWorkoutTab() {
                   <div key={t.id} className="flex items-center gap-2 group">
                     <button
                       onClick={() => handleWorkoutFromTemplate(t)}
+                      disabled={!newWorkoutDate}
                       className="flex-1 flex items-center justify-between px-3 py-2 rounded-lg border hover:bg-muted/40 transition-colors text-left"
                     >
                       <span className="text-sm font-medium">{t.name}</span>

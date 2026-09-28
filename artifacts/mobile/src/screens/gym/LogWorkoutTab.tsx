@@ -210,11 +210,15 @@ function ExercisePickerModal({ visible, onClose, exercises, onSelect, color, wor
   );
 }
 
-function WorkoutDetailsModal({ visible, workout, onClose, onSave, color }: {
+type WorkoutDetails = { title: string | null; date: string };
+
+// Used both to create a workout (heading "New workout") and to edit one.
+function WorkoutDetailsModal({ visible, initial, heading, onClose, onSave, color }: {
   visible: boolean
-  workout: GymWorkout | null
+  initial: WorkoutDetails | null
+  heading: string
   onClose: () => void
-  onSave: (id: number, data: { title: string | null; date: string }) => void
+  onSave: (data: WorkoutDetails) => void
   color: ThemeColors
 }) {
   const presets: readonly string[] = WORKOUT_TITLE_PRESETS;
@@ -224,28 +228,28 @@ function WorkoutDetailsModal({ visible, workout, onClose, onSave, color }: {
   const { height: windowHeight } = useWindowDimensions();
 
   React.useEffect(() => {
-    if (!visible || !workout) return;
-    const isPreset = workout.title != null && presets.includes(workout.title);
-    setSelected(isPreset ? workout.title! : workout.title ? 'Other' : 'Chest');
-    setCustomTitle(!isPreset && workout.title ? workout.title : '');
-    setDate(workout.date);
-  }, [visible, workout]);
+    if (!visible || !initial) return;
+    const isPreset = initial.title != null && presets.includes(initial.title);
+    setSelected(isPreset ? initial.title! : initial.title ? 'Other' : 'Chest');
+    setCustomTitle(!isPreset && initial.title ? initial.title : '');
+    setDate(initial.date);
+  }, [visible, initial]);
 
-  if (!workout) return null;
+  if (!initial) return null;
 
   const dateValid = DATE_RE.test(date);
   const effectiveTitle = selected === 'Other' ? customTitle.trim() : selected;
 
   function handleSave() {
-    if (!workout || !dateValid) return;
-    onSave(workout.id, { title: effectiveTitle || null, date });
+    if (!dateValid) return;
+    onSave({ title: effectiveTitle || null, date });
     onClose();
   }
 
   return (
     <BottomSheetModal visible={visible} onClose={onClose}>
         <View style={[styles.modalCard, { backgroundColor: color.card, maxHeight: windowHeight * 0.75 }]}>
-          <Text style={[styles.modalTitle, { color: color.foreground }]}>Workout details</Text>
+          <Text style={[styles.modalTitle, { color: color.foreground }]}>{heading}</Text>
 
           <View style={styles.presetRow}>
             {[...WORKOUT_TITLE_PRESETS, 'Other'].map(t => (
@@ -368,13 +372,19 @@ export default function LogWorkoutTab() {
 
   const [pickerWorkoutId, setPickerWorkoutId] = React.useState<number | null>(null);
   const [editingWorkout, setEditingWorkout] = React.useState<GymWorkout | null>(null);
+  const [newWorkout, setNewWorkout] = React.useState<WorkoutDetails | null>(null);
+  // Stable identity so the modal only re-seeds its fields when a different workout is opened.
+  const editingDetails = React.useMemo<WorkoutDetails | null>(
+    () => editingWorkout && { title: editingWorkout.title ?? null, date: editingWorkout.date },
+    [editingWorkout],
+  );
 
   function invalidateWorkouts() { queryClient.invalidateQueries({ queryKey: getListGymWorkoutsQueryKey() }); }
   function invalidateEntries() { queryClient.invalidateQueries({ queryKey: getListGymWorkoutEntriesQueryKey() }); }
   function invalidateSets() { queryClient.invalidateQueries({ queryKey: getListGymWorkoutSetsQueryKey() }); }
 
-  function handleAddWorkout() {
-    createWorkout.mutate({ data: { date: todayStr() } }, { onSuccess: invalidateWorkouts });
+  function handleCreateWorkout(data: WorkoutDetails) {
+    createWorkout.mutate({ data: { date: data.date, title: data.title ?? undefined } }, { onSuccess: invalidateWorkouts });
   }
 
   function handleDeleteWorkout(id: number) {
@@ -431,7 +441,7 @@ export default function LogWorkoutTab() {
 
   return (
     <View style={{ flex: 1 }}>
-      <TouchableOpacity style={[styles.newWorkoutBtn, { backgroundColor: color.primary }]} onPress={handleAddWorkout}>
+      <TouchableOpacity style={[styles.newWorkoutBtn, { backgroundColor: color.primary }]} onPress={() => setNewWorkout({ title: null, date: todayStr() })}>
         <Ionicons name="add" size={16} color={color.primaryForeground} />
         <Text style={{ color: color.primaryForeground, fontWeight: '600', fontSize: 13 }}>Add Workout</Text>
       </TouchableOpacity>
@@ -469,10 +479,20 @@ export default function LogWorkoutTab() {
       />
 
       <WorkoutDetailsModal
+        visible={newWorkout != null}
+        initial={newWorkout}
+        heading="New workout"
+        onClose={() => setNewWorkout(null)}
+        onSave={handleCreateWorkout}
+        color={color}
+      />
+
+      <WorkoutDetailsModal
         visible={editingWorkout != null}
-        workout={editingWorkout}
+        initial={editingDetails}
+        heading="Workout details"
         onClose={() => setEditingWorkout(null)}
-        onSave={handleUpdateWorkout}
+        onSave={data => editingWorkout && handleUpdateWorkout(editingWorkout.id, data)}
         color={color}
       />
     </View>

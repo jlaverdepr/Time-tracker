@@ -54,7 +54,7 @@ export const gymRunsTable = sqliteTable("gym_runs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   date: text("date").notNull(),
   distanceKm: real("distance_km"),
-  durationMinutes: integer("duration_minutes"),
+  durationSeconds: integer("duration_seconds"),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),

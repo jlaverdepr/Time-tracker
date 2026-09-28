@@ -77,7 +77,7 @@ function serializeRun(row: GymRun) {
     id: row.id,
     date: row.date,
     distanceKm: row.distanceKm ?? null,
-    durationMinutes: row.durationMinutes ?? null,
+    durationSeconds: row.durationSeconds ?? null,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -284,7 +284,7 @@ router.post("/gym-runs", async (req, res): Promise<void> => {
   const [row] = await db.insert(gymRunsTable).values({
     date: parsed.data.date ?? format(new Date(), "yyyy-MM-dd"),
     distanceKm: parsed.data.distanceKm ?? null,
-    durationMinutes: parsed.data.durationMinutes ?? null,
+    durationSeconds: parsed.data.durationSeconds ?? null,
   }).returning();
   res.status(201).json(CreateGymRunResponse.parse(serializeRun(row)));
 });
@@ -298,7 +298,7 @@ router.patch("/gym-runs/:id", async (req, res): Promise<void> => {
   const updates: Partial<typeof gymRunsTable.$inferInsert> = {};
   if (parsed.data.date !== undefined) updates.date = parsed.data.date;
   if ("distanceKm" in parsed.data) updates.distanceKm = parsed.data.distanceKm ?? null;
-  if ("durationMinutes" in parsed.data) updates.durationMinutes = parsed.data.durationMinutes ?? null;
+  if ("durationSeconds" in parsed.data) updates.durationSeconds = parsed.data.durationSeconds ?? null;
 
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Nothing to update" }); return; }
   const [row] = await db.update(gymRunsTable).set(updates).where(eq(gymRunsTable.id, params.data.id)).returning();

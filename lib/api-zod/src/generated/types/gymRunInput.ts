@@ -10,5 +10,6 @@ export interface GymRunInput {
   /** YYYY-MM-DD; defaults to today if omitted */
   date?: string;
   distanceKm?: number;
-  durationMinutes?: number;
+  /** @minimum 0 */
+  durationSeconds?: number;
 }

@@ -1838,8 +1838,9 @@ components:
           description: "YYYY-MM-DD"
         distanceKm:
           type: ["number", "null"]
-        durationMinutes:
+        durationSeconds:
           type: ["integer", "null"]
+          description: "Total run time in seconds"
         createdAt:
           type: string
 
@@ -1851,8 +1852,9 @@ components:
           description: "YYYY-MM-DD; defaults to today if omitted"
         distanceKm:
           type: number
-        durationMinutes:
+        durationSeconds:
           type: integer
+          minimum: 0
 
     GymRunUpdate:
       type: object
@@ -1861,8 +1863,9 @@ components:
           type: string
         distanceKm:
           type: ["number", "null"]
-        durationMinutes:
+        durationSeconds:
           type: ["integer", "null"]
+          minimum: 0
 
     GymBodyWeightLog:
       type: object

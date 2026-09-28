@@ -10,6 +10,9 @@ export interface GymRunUpdate {
   date?: string;
   /** @nullable */
   distanceKm?: number | null;
-  /** @nullable */
-  durationMinutes?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  durationSeconds?: number | null;
 }

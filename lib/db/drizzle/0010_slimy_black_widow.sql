@@ -1,0 +1,1 @@
+ALTER TABLE `gym_runs` DROP COLUMN `duration_minutes`;

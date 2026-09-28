@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { SessionDialog } from "@/components/session-dialog"
 import { ConfettiBurst } from "@/components/confetti-burst"
 import type { Session } from "@workspace/api-client-react"
-import { categoryColor, formatDuration, formatPace, formatSpeed, todayStr } from "@workspace/shared"
+import { categoryColor, formatDuration, formatPace, formatRunTime, formatSpeed, todayStr } from "@workspace/shared"
 
 type CalendarIconKey = "subprojectActive" | "subprojectCompleted" | "todoBadges" | "workout" | "run" | "prepared"
 
@@ -693,11 +693,11 @@ export default function Calendar() {
                       />
                     ))}
                     {selectedDayRuns.map(run => {
-                      const pace = run.distanceKm != null && run.durationMinutes != null
-                        ? formatPace(run.distanceKm, run.durationMinutes)
+                      const pace = run.distanceKm != null && run.durationSeconds != null
+                        ? formatPace(run.distanceKm, run.durationSeconds)
                         : null
-                      const speed = run.distanceKm != null && run.durationMinutes != null
-                        ? formatSpeed(run.distanceKm, run.durationMinutes)
+                      const speed = run.distanceKm != null && run.durationSeconds != null
+                        ? formatSpeed(run.distanceKm, run.durationSeconds)
                         : null
                       return (
                         <div key={`r-${run.id}`} className="p-3 rounded-lg border bg-card flex items-center gap-3">
@@ -710,8 +710,8 @@ export default function Calendar() {
                           {run.distanceKm != null && (
                             <span className="text-sm font-medium tabular-nums text-sky-600">{run.distanceKm} km</span>
                           )}
-                          {run.durationMinutes != null && (
-                            <span className="text-xs text-muted-foreground tabular-nums">{run.durationMinutes} min</span>
+                          {run.durationSeconds != null && (
+                            <span className="text-xs text-muted-foreground tabular-nums">{formatRunTime(run.durationSeconds)}</span>
                           )}
                           {speed && (
                             <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{speed}</span>

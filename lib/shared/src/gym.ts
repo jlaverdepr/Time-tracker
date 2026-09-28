@@ -34,18 +34,24 @@ export function orderCategoriesForTitle(title?: string | null): typeof CATEGORIE
   return [match, ...reordered]
 }
 
-export function formatPace(distanceKm: number, durationMinutes: number): string | null {
-  if (distanceKm <= 0 || durationMinutes <= 0) return null
-  const paceMinPerKm = durationMinutes / distanceKm
-  let min = Math.floor(paceMinPerKm)
-  let sec = Math.round((paceMinPerKm - min) * 60)
-  if (sec === 60) { min += 1; sec = 0 }
-  return `${min}:${String(sec).padStart(2, "0")} /km`
+// Run time as m:ss, or h:mm:ss for an hour or more.
+export function formatRunTime(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  const ss = String(s).padStart(2, "0")
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`
 }
 
-export function formatSpeed(distanceKm: number, durationMinutes: number): string | null {
-  if (distanceKm <= 0 || durationMinutes <= 0) return null
-  const speedKmh = distanceKm / (durationMinutes / 60)
+export function formatPace(distanceKm: number, durationSeconds: number): string | null {
+  if (distanceKm <= 0 || durationSeconds <= 0) return null
+  const secPerKm = Math.round(durationSeconds / distanceKm)
+  return `${Math.floor(secPerKm / 60)}:${String(secPerKm % 60).padStart(2, "0")} /km`
+}
+
+export function formatSpeed(distanceKm: number, durationSeconds: number): string | null {
+  if (distanceKm <= 0 || durationSeconds <= 0) return null
+  const speedKmh = distanceKm / (durationSeconds / 3600)
   return `${speedKmh.toFixed(1)} km/h`
 }
 

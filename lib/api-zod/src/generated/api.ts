@@ -1001,7 +1001,7 @@ export const ListGymRunsResponseItem = zod.object({
   "id": zod.number(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "distanceKm": zod.number().nullish(),
-  "durationMinutes": zod.number().nullish(),
+  "durationSeconds": zod.number().nullish().describe('Total run time in seconds'),
   "createdAt": zod.string()
 })
 export const ListGymRunsResponse = zod.array(ListGymRunsResponseItem)
@@ -1010,17 +1010,21 @@ export const ListGymRunsResponse = zod.array(ListGymRunsResponseItem)
 /**
  * @summary Log a run
  */
+export const createGymRunBodyDurationSecondsMin = 0;
+
+
+
 export const CreateGymRunBody = zod.object({
   "date": zod.string().optional().describe('YYYY-MM-DD; defaults to today if omitted'),
   "distanceKm": zod.number().optional(),
-  "durationMinutes": zod.number().optional()
+  "durationSeconds": zod.number().min(createGymRunBodyDurationSecondsMin).optional()
 })
 
 export const CreateGymRunResponse = zod.object({
   "id": zod.number(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "distanceKm": zod.number().nullish(),
-  "durationMinutes": zod.number().nullish(),
+  "durationSeconds": zod.number().nullish().describe('Total run time in seconds'),
   "createdAt": zod.string()
 })
 
@@ -1032,17 +1036,21 @@ export const UpdateGymRunParams = zod.object({
   "id": zod.coerce.number()
 })
 
+export const updateGymRunBodyDurationSecondsMin = 0;
+
+
+
 export const UpdateGymRunBody = zod.object({
   "date": zod.string().optional(),
   "distanceKm": zod.number().nullish(),
-  "durationMinutes": zod.number().nullish()
+  "durationSeconds": zod.number().min(updateGymRunBodyDurationSecondsMin).nullish()
 })
 
 export const UpdateGymRunResponse = zod.object({
   "id": zod.number(),
   "date": zod.string().describe('YYYY-MM-DD'),
   "distanceKm": zod.number().nullish(),
-  "durationMinutes": zod.number().nullish(),
+  "durationSeconds": zod.number().nullish().describe('Total run time in seconds'),
   "createdAt": zod.string()
 })
 

@@ -17,7 +17,7 @@ import type { TodoList, GymWorkout } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../lib/theme';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { BottomSheetModal } from '../components/BottomSheetModal';
-import { categoryColor, formatDuration, formatPace, formatSpeed, toDateStr, todayStr } from '@workspace/shared';
+import { categoryColor, formatDuration, formatPace, formatRunTime, formatSpeed, toDateStr, todayStr } from '@workspace/shared';
 
 function intensityColor(minutes: number, primary: string, muted: string): string {
   if (minutes === 0) return muted;
@@ -353,8 +353,8 @@ function DayDetailModal({ date, onClose, color }: { date: string | null; onClose
                   />
                 ))}
                 {dayRuns.map(run => {
-                  const pace = run.distanceKm != null && run.durationMinutes != null ? formatPace(run.distanceKm, run.durationMinutes) : null;
-                  const speed = run.distanceKm != null && run.durationMinutes != null ? formatSpeed(run.distanceKm, run.durationMinutes) : null;
+                  const pace = run.distanceKm != null && run.durationSeconds != null ? formatPace(run.distanceKm, run.durationSeconds) : null;
+                  const speed = run.distanceKm != null && run.durationSeconds != null ? formatSpeed(run.distanceKm, run.durationSeconds) : null;
                   return (
                     <View key={`r-${run.id}`} style={[styles.runRow, { backgroundColor: color.card, borderColor: color.border }]}>
                       <View style={[styles.iconCircle, { backgroundColor: '#0ea5e9' }]}>
@@ -362,7 +362,7 @@ function DayDetailModal({ date, onClose, color }: { date: string | null; onClose
                       </View>
                       <Text style={[styles.panelTitle, { color: color.foreground, flex: 1 }]}>Run</Text>
                       {run.distanceKm != null && <Text style={[styles.runStat, { color: '#0284c7' }]}>{run.distanceKm} km</Text>}
-                      {run.durationMinutes != null && <Text style={[styles.runStatMuted, { color: color.mutedForeground }]}>{run.durationMinutes} min</Text>}
+                      {run.durationSeconds != null && <Text style={[styles.runStatMuted, { color: color.mutedForeground }]}>{formatRunTime(run.durationSeconds)}</Text>}
                       {speed && <Text style={[styles.runPill, { color: color.mutedForeground, backgroundColor: '#0ea5e91a' }]}>{speed}</Text>}
                       {pace && <Text style={[styles.runPill, { color: color.mutedForeground, backgroundColor: '#0ea5e91a' }]}>{pace}</Text>}
                     </View>

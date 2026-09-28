@@ -26,7 +26,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGr
 import { Plus, Trash2, Pencil, Check, X, Dumbbell, ListChecks, Trophy, Footprints, Save, LineChart as LineChartIcon } from "lucide-react"
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts"
 import { cn } from "@/lib/utils"
-import { CATEGORIES, categoryColor, formatPace, formatSpeed, orderCategoriesForTitle, sanitizeNumericInput, todayStr } from "@workspace/shared"
+import { CATEGORIES, categoryColor, formatPace, formatRunTime, formatSpeed, orderCategoriesForTitle, sanitizeNumericInput, todayStr } from "@workspace/shared"
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -714,7 +714,7 @@ function WorkoutCard({
 
 // ── runs ─────────────────────────────────────────────────────────────────────────
 
-type RunFormData = { date: string; distanceKm: number | null; durationMinutes: number | null }
+type RunFormData = { date: string; distanceKm: number | null; durationSeconds: number | null }
 
 function RunFormDialog({
   open,
@@ -731,21 +731,24 @@ function RunFormDialog({
 }) {
   const [date, setDate] = React.useState(initial.date)
   const [distance, setDistance] = React.useState(initial.distanceKm != null ? String(initial.distanceKm) : "")
-  const [duration, setDuration] = React.useState(initial.durationMinutes != null ? String(initial.durationMinutes) : "")
+  const [minutes, setMinutes] = React.useState("")
+  const [seconds, setSeconds] = React.useState("")
 
   React.useEffect(() => {
     if (!open) return
     setDate(initial.date)
     setDistance(initial.distanceKm != null ? String(initial.distanceKm) : "")
-    setDuration(initial.durationMinutes != null ? String(initial.durationMinutes) : "")
+    setMinutes(initial.durationSeconds != null ? String(Math.floor(initial.durationSeconds / 60)) : "")
+    setSeconds(initial.durationSeconds != null ? String(initial.durationSeconds % 60) : "")
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initial.date, initial.distanceKm, initial.durationMinutes])
+  }, [open, initial.date, initial.distanceKm, initial.durationSeconds])
 
   function handleSubmit() {
+    const noTime = minutes.trim() === "" && seconds.trim() === ""
     onSubmit({
       date,
       distanceKm: distance.trim() === "" ? null : Number(distance),
-      durationMinutes: duration.trim() === "" ? null : Number(duration),
+      durationSeconds: noTime ? null : Number(minutes || 0) * 60 + Number(seconds || 0),
     })
     onOpenChange(false)
   }
@@ -770,13 +773,25 @@ function RunFormDialog({
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">Time (min)</label>
-              <Input
-                type="text" inputMode="numeric"
-                value={duration}
-                onChange={e => setDuration(sanitizeNumericInput(e.target.value, false))}
-                placeholder="32"
-              />
+              <label className="text-xs text-muted-foreground">Time (min : sec)</label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="text" inputMode="numeric" aria-label="Minutes"
+                  value={minutes}
+                  onChange={e => setMinutes(sanitizeNumericInput(e.target.value, false))}
+                  placeholder="32"
+                />
+                <span className="text-muted-foreground">:</span>
+                <Input
+                  type="text" inputMode="numeric" aria-label="Seconds"
+                  value={seconds}
+                  onChange={e => {
+                    const v = sanitizeNumericInput(e.target.value, false).slice(0, 2)
+                    setSeconds(v !== "" && Number(v) > 59 ? "59" : v)
+                  }}
+                  placeholder="00"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -800,11 +815,11 @@ function RunCard({
 }) {
   const [editing, setEditing] = React.useState(false)
   const dateLabel = format(parseISO(run.date), "EEEE, MMM d")
-  const pace = run.distanceKm != null && run.durationMinutes != null
-    ? formatPace(run.distanceKm, run.durationMinutes)
+  const pace = run.distanceKm != null && run.durationSeconds != null
+    ? formatPace(run.distanceKm, run.durationSeconds)
     : null
-  const speed = run.distanceKm != null && run.durationMinutes != null
-    ? formatSpeed(run.distanceKm, run.durationMinutes)
+  const speed = run.distanceKm != null && run.durationSeconds != null
+    ? formatSpeed(run.distanceKm, run.durationSeconds)
     : null
 
   return (
@@ -823,8 +838,8 @@ function RunCard({
         {run.distanceKm != null && (
           <span className="text-sm font-medium tabular-nums text-sky-600">{run.distanceKm} km</span>
         )}
-        {run.durationMinutes != null && (
-          <span className="text-sm text-muted-foreground tabular-nums">{run.durationMinutes} min</span>
+        {run.durationSeconds != null && (
+          <span className="text-sm text-muted-foreground tabular-nums">{formatRunTime(run.durationSeconds)}</span>
         )}
         {speed && (
           <span className="text-xs text-muted-foreground tabular-nums bg-sky-500/10 px-1.5 py-0.5 rounded">{speed}</span>
@@ -842,7 +857,7 @@ function RunCard({
         open={editing}
         onOpenChange={setEditing}
         title="Run details"
-        initial={{ date: run.date, distanceKm: run.distanceKm ?? null, durationMinutes: run.durationMinutes ?? null }}
+        initial={{ date: run.date, distanceKm: run.distanceKm ?? null, durationSeconds: run.durationSeconds ?? null }}
         onSubmit={data => onUpdate(run.id, data)}
       />
     </div>
@@ -1056,7 +1071,7 @@ function LogWorkoutTab() {
 
   function handleAddRun(data: RunFormData) {
     createRun.mutate({
-      data: { date: data.date, distanceKm: data.distanceKm ?? undefined, durationMinutes: data.durationMinutes ?? undefined },
+      data: { date: data.date, distanceKm: data.distanceKm ?? undefined, durationSeconds: data.durationSeconds ?? undefined },
     }, { onSuccess: () => { invalidateRuns(); toast({ title: "Run logged" }) } })
   }
 
@@ -1272,7 +1287,7 @@ function LogWorkoutTab() {
         open={addRunOpen}
         onOpenChange={setAddRunOpen}
         title="Log a run"
-        initial={{ date: todayStr(), distanceKm: null, durationMinutes: null }}
+        initial={{ date: todayStr(), distanceKm: null, durationSeconds: null }}
         onSubmit={handleAddRun}
       />
 

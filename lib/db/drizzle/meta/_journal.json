@@ -64,6 +64,20 @@
       "when": 1784627516996,
       "tag": "0008_familiar_jack_murdock",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790581571547,
+      "tag": "0009_living_mandarin",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790581579592,
+      "tag": "0010_slimy_black_widow",
+      "breakpoints": true
     }
   ]
 }

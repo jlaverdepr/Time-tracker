@@ -12,7 +12,10 @@ export interface GymRun {
   date: string;
   /** @nullable */
   distanceKm?: number | null;
-  /** @nullable */
-  durationMinutes?: number | null;
+  /**
+     * Total run time in seconds
+     * @nullable
+     */
+  durationSeconds?: number | null;
   createdAt: string;
 }

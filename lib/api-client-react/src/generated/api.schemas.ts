@@ -406,8 +406,11 @@ export interface GymRun {
   date: string;
   /** @nullable */
   distanceKm?: number | null;
-  /** @nullable */
-  durationMinutes?: number | null;
+  /**
+     * Total run time in seconds
+     * @nullable
+     */
+  durationSeconds?: number | null;
   createdAt: string;
 }
 
@@ -415,15 +418,19 @@ export interface GymRunInput {
   /** YYYY-MM-DD; defaults to today if omitted */
   date?: string;
   distanceKm?: number;
-  durationMinutes?: number;
+  /** @minimum 0 */
+  durationSeconds?: number;
 }
 
 export interface GymRunUpdate {
   date?: string;
   /** @nullable */
   distanceKm?: number | null;
-  /** @nullable */
-  durationMinutes?: number | null;
+  /**
+     * @minimum 0
+     * @nullable
+     */
+  durationSeconds?: number | null;
 }
 
 export interface GymBodyWeightLog {

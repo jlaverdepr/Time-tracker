@@ -317,7 +317,7 @@ function SetInput({
             onBlur={commit}
             onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
             placeholder="reps"
-            className={cn(inputClass, "w-10 pointer-coarse:h-9 pointer-coarse:w-12")}
+            className={cn(inputClass, "w-10")}
           />
           <span className="text-[10px] leading-none text-muted-foreground shrink-0">x</span>
           <input
@@ -327,25 +327,24 @@ function SetInput({
             onBlur={commit}
             onKeyDown={handleWeightKeyDown}
             placeholder="kg"
-            className={cn(inputClass, "w-14 pointer-coarse:h-9 pointer-coarse:w-16")}
+            className={cn(inputClass, "w-14")}
           />
         </div>
       ) : (
         <div
           className={cn(
-            "h-7 pointer-coarse:h-9 px-2 flex items-center justify-center text-xs pointer-coarse:text-sm font-medium rounded-md border bg-background whitespace-nowrap",
+            "h-7 px-2 flex items-center justify-center text-xs font-medium rounded-md border bg-background whitespace-nowrap",
             set.failure && "border-red-500 text-red-600",
           )}
         >
           {set.reps} x {set.weight} kg
         </div>
       )}
-      {/* Mouse: small badges on the set's corner, shown on hover. Touch: a finger-sized row under the set. */}
-      <div className="absolute -top-1 -right-1 flex items-center gap-0.5 opacity-0 group-hover/slot:opacity-100 transition-opacity pointer-coarse:static pointer-coarse:opacity-100 pointer-coarse:gap-2 pointer-coarse:mt-1">
+      <div className="absolute -top-1 -right-1 flex items-center gap-0.5 opacity-0 group-hover/slot:opacity-100 pointer-coarse:opacity-100 transition-opacity">
         {!editing && (
           <button type="button" onClick={() => setEditing(true)} title="Edit"
-            className="h-4 w-4 pointer-coarse:h-7 pointer-coarse:w-7 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20">
-            <Pencil className="h-2.5 w-2.5 pointer-coarse:h-3.5 pointer-coarse:w-3.5" />
+            className="h-4 w-4 rounded-full bg-muted flex items-center justify-center hover:bg-muted-foreground/20">
+            <Pencil className="h-2.5 w-2.5" />
           </button>
         )}
         <button
@@ -353,7 +352,7 @@ function SetInput({
           onClick={() => onToggleFailure(set.id, !set.failure)}
           title={set.failure ? "Unmark failure" : "Mark as failure"}
           className={cn(
-            "h-4 w-4 pointer-coarse:h-7 pointer-coarse:w-7 rounded-full flex items-center justify-center text-[9px] pointer-coarse:text-xs font-bold",
+            "h-4 w-4 rounded-full flex items-center justify-center text-[9px] font-bold",
             set.failure ? "bg-red-600 text-white opacity-100" : "bg-red-100 text-red-600 hover:bg-red-200",
           )}
         >
@@ -363,9 +362,9 @@ function SetInput({
           type="button"
           onClick={() => onDelete(set.id)}
           title="Delete set"
-          className="h-4 w-4 pointer-coarse:h-7 pointer-coarse:w-7 rounded-full bg-muted flex items-center justify-center hover:bg-destructive/10 hover:text-destructive"
+          className="h-4 w-4 rounded-full bg-muted flex items-center justify-center hover:bg-destructive/10 hover:text-destructive"
         >
-          <Trash2 className="h-2.5 w-2.5 pointer-coarse:h-3.5 pointer-coarse:w-3.5" />
+          <Trash2 className="h-2.5 w-2.5" />
         </button>
       </div>
     </div>
@@ -427,7 +426,7 @@ function SetGroup({
   }
 
   return (
-    <div className="flex flex-wrap items-start md:items-end gap-1.5 pointer-coarse:gap-2.5 justify-start md:justify-end">
+    <div className="flex items-end gap-1.5 justify-end">
       {sorted.map((s, i) => (
         <SetInput
           key={s.id} set={s} index={i + 1}
@@ -439,12 +438,166 @@ function SetGroup({
         <button
           type="button"
           onClick={() => onCreateSet(entryId, isWarmup, sorted.length + 1)}
-          className="h-7 pointer-coarse:h-9 mt-3 md:mt-0 px-2 rounded-md border border-dashed text-[10px] pointer-coarse:text-xs text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1 shrink-0"
+          className="h-7 px-2 rounded-md border border-dashed text-[10px] text-muted-foreground hover:text-foreground hover:border-foreground/40 transition-colors flex items-center gap-1 shrink-0"
         >
           <Plus className="h-3 w-3" />
           Add Set
         </button>
       )}
+    </div>
+  )
+}
+
+// ── phone set table ───────────────────────────────────────────────────────────
+// The layout Hevy and Strong use on phones: one row per set, SET | PREVIOUS |
+// KG | REPS, inputs editable in place. Set actions (failure, delete) live
+// behind a tap on the set label instead of icons on every set.
+
+type PreviousSets = { main: GymWorkoutSet[]; warmup: GymWorkoutSet[] }
+
+function formatSet(s: GymWorkoutSet | undefined): string {
+  return s && s.reps != null && s.weight != null ? `${s.weight} × ${s.reps}` : "—"
+}
+
+function SetTableRow({
+  set,
+  label,
+  previous,
+  onUpdate,
+  onToggleFailure,
+  onDelete,
+}: {
+  set: GymWorkoutSet
+  label: string
+  previous: GymWorkoutSet | undefined
+  onUpdate: (id: number, data: { reps?: number | null; weight?: number | null }) => void
+  onToggleFailure: (id: number, next: boolean) => void
+  onDelete: (id: number) => void
+}) {
+  const [weightText, setWeightText] = React.useState(set.weight != null ? String(set.weight) : "")
+  const [repsText, setRepsText] = React.useState(set.reps != null ? String(set.reps) : "")
+  const [menuOpen, setMenuOpen] = React.useState(false)
+
+  React.useEffect(() => { setWeightText(set.weight != null ? String(set.weight) : "") }, [set.weight])
+  React.useEffect(() => { setRepsText(set.reps != null ? String(set.reps) : "") }, [set.reps])
+
+  function commit(field: "weight" | "reps", text: string) {
+    const trimmed = text.trim()
+    const value = trimmed === "" ? null : Number(trimmed)
+    if (value !== null && Number.isNaN(value)) return
+    if (value !== (set[field] ?? null)) onUpdate(set.id, { [field]: value })
+  }
+
+  const inputClass = "h-9 w-full rounded-md border bg-background text-center text-[15px] tabular-nums focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/35"
+
+  return (
+    <>
+      <div className="grid grid-cols-[2.75rem_1fr_4.5rem_4.5rem] items-center gap-2 py-1">
+        <button
+          type="button"
+          onClick={() => setMenuOpen(o => !o)}
+          className={cn(
+            "h-8 rounded-md text-sm font-semibold tabular-nums",
+            set.isWarmup ? "text-amber-500" : "text-foreground",
+            set.failure && "text-red-500",
+            menuOpen && "bg-muted",
+          )}
+          title="Set options"
+        >
+          {set.failure ? `${label}F` : label}
+        </button>
+        <span className="text-xs text-muted-foreground tabular-nums truncate">{formatSet(previous)}</span>
+        <input
+          data-compact
+          type="text" inputMode="decimal" enterKeyHint="next"
+          value={weightText}
+          onChange={e => setWeightText(sanitizeNumericInput(e.target.value, true))}
+          onBlur={() => commit("weight", weightText)}
+          placeholder={previous?.weight != null ? String(previous.weight) : "kg"}
+          className={inputClass}
+        />
+        <input
+          data-compact
+          type="text" inputMode="numeric" enterKeyHint="done"
+          value={repsText}
+          onChange={e => setRepsText(sanitizeNumericInput(e.target.value, false))}
+          onBlur={() => commit("reps", repsText)}
+          onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
+          placeholder={previous?.reps != null ? String(previous.reps) : "reps"}
+          className={inputClass}
+        />
+      </div>
+      {menuOpen && (
+        <div className="flex items-center gap-2 pb-1.5 pl-[3.25rem]">
+          <Button type="button" size="sm" variant={set.failure ? "default" : "outline"}
+            className={cn("h-8 gap-1.5", set.failure && "bg-red-600 hover:bg-red-600/90 text-white")}
+            onClick={() => { onToggleFailure(set.id, !set.failure); setMenuOpen(false) }}>
+            <span className="font-bold">F</span>
+            {set.failure ? "Not to failure" : "To failure"}
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="h-8 gap-1.5 text-destructive"
+            onClick={() => { onDelete(set.id); setMenuOpen(false) }}>
+            <Trash2 className="h-3.5 w-3.5" />
+            Delete set
+          </Button>
+        </div>
+      )}
+    </>
+  )
+}
+
+function SetTable({
+  entryId,
+  sets,
+  previous,
+  onCreateSet,
+  onUpdateSet,
+  onToggleFailure,
+  onDeleteSet,
+}: {
+  entryId: number
+  sets: GymWorkoutSet[]
+  previous: PreviousSets | undefined
+  onCreateSet: (entryId: number, isWarmup: boolean, nextIndex: number) => void
+  onUpdateSet: (id: number, data: { reps?: number | null; weight?: number | null }) => void
+  onToggleFailure: (id: number, next: boolean) => void
+  onDeleteSet: (id: number) => void
+}) {
+  const bySetIndex = (a: GymWorkoutSet, b: GymWorkoutSet) => a.setIndex - b.setIndex
+  const warmups = sets.filter(s => s.isWarmup).sort(bySetIndex)
+  const mains = sets.filter(s => !s.isWarmup).sort(bySetIndex)
+  const rowProps = { onUpdate: onUpdateSet, onToggleFailure, onDelete: onDeleteSet }
+
+  return (
+    <div className="w-full">
+      <div className="grid grid-cols-[2.75rem_1fr_4.5rem_4.5rem] gap-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <span className="text-center">Set</span>
+        <span>Previous</span>
+        <span className="text-center">kg</span>
+        <span className="text-center">Reps</span>
+      </div>
+      {warmups.map((s, i) => (
+        <SetTableRow key={s.id} set={s} label="W" previous={previous?.warmup[i]} {...rowProps} />
+      ))}
+      {mains.map((s, i) => (
+        <SetTableRow key={s.id} set={s} label={String(i + 1)} previous={previous?.main[i]} {...rowProps} />
+      ))}
+      <div className="flex gap-2 pt-1.5">
+        {mains.length < MAX_SETS && (
+          <Button type="button" variant="secondary" size="sm" className="h-9 flex-1 gap-1.5"
+            onClick={() => onCreateSet(entryId, false, mains.length + 1)}>
+            <Plus className="h-3.5 w-3.5" />
+            Add Set
+          </Button>
+        )}
+        {warmups.length < MAX_SETS && (
+          <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5 text-amber-600 dark:text-amber-500"
+            onClick={() => onCreateSet(entryId, true, warmups.length + 1)}>
+            <Plus className="h-3.5 w-3.5" />
+            Warm-up
+          </Button>
+        )}
+      </div>
     </div>
   )
 }
@@ -458,10 +611,12 @@ function WorkoutEntryRow({
   onUpdateSet,
   onToggleFailure,
   onDeleteSet,
+  previous,
 }: {
   entry: GymWorkoutEntry
   exercise: GymExercise | undefined
   sets: GymWorkoutSet[]
+  previous: PreviousSets | undefined
   onDelete: (id: number) => void
   onCreateSet: (entryId: number, isWarmup: boolean, nextIndex: number) => void
   onUpdateSet: (id: number, data: { reps?: number | null; weight?: number | null }) => void
@@ -482,11 +637,27 @@ function WorkoutEntryRow({
   }
 
   return (
-    <div className="flex flex-wrap md:flex-nowrap items-center gap-x-3 gap-y-2 px-3 py-2.5 rounded-xl border bg-card group">
+    <>
+    {/* phone */}
+    <div className="md:hidden px-3 pt-2.5 pb-3 rounded-xl border bg-card">
+      <div className="flex items-center gap-2.5 pb-2">
+        <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(exercise?.category ?? "Minor") }} />
+        <span className="flex-1 min-w-0 text-sm font-semibold">{exercise?.name ?? "Unknown exercise"}</span>
+        <button onClick={() => onDelete(entry.id)} title="Remove exercise"
+          className="p-2 -mr-1.5 rounded hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0">
+          <Trash2 className="h-4 w-4 text-muted-foreground" />
+        </button>
+      </div>
+      <SetTable entryId={entry.id} sets={sets} previous={previous}
+        onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
+    </div>
+
+    {/* desktop */}
+    <div className="hidden md:flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-card group">
       <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: categoryColor(exercise?.category ?? "Minor") }} />
 
-      <div className="flex-1 md:flex-none md:w-44 min-w-0 md:shrink-0 flex flex-col justify-center gap-0.5">
-        <div className="text-sm font-medium md:truncate">{exercise?.name ?? "Unknown exercise"}</div>
+      <div className="w-44 shrink-0 flex flex-col justify-center gap-0.5">
+        <div className="text-sm font-medium truncate">{exercise?.name ?? "Unknown exercise"}</div>
         {!warmupOpen && (
           <button
             onClick={handleAddOrEditWarmup}
@@ -497,11 +668,11 @@ function WorkoutEntryRow({
         )}
       </div>
 
-      <div className="order-last md:order-none w-full md:w-auto md:flex-1 flex flex-col justify-center gap-1.5 min-w-0">
+      <div className="flex-1 flex flex-col justify-center gap-1.5 min-w-0">
         <SetGroup sets={mainSets} isWarmup={false} entryId={entry.id}
           onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
         {warmupOpen ? (
-          <div className="flex flex-wrap items-end gap-2 justify-start md:justify-end">
+          <div className="flex items-end gap-2 justify-end">
             <span className="text-[10px] text-muted-foreground shrink-0 pb-1.5">Warmup</span>
             <SetGroup sets={warmupSets} isWarmup={true} entryId={entry.id}
               onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
@@ -510,17 +681,18 @@ function WorkoutEntryRow({
             </button>
           </div>
         ) : filledWarmupSets.length > 0 ? (
-          <div className="text-xs text-muted-foreground md:text-right">
+          <div className="text-xs text-muted-foreground text-right">
             Warmup: {filledWarmupSets.map(s => `${s.reps} x ${s.weight} kg`).join(", ")}
           </div>
         ) : null}
       </div>
 
       <button onClick={() => onDelete(entry.id)}
-        className="p-1 pointer-coarse:p-2 md:order-last rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0">
+        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 shrink-0">
         <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
     </div>
+    </>
   )
 }
 
@@ -610,11 +782,13 @@ function WorkoutCard({
   onUpdateWorkout,
   onAddExercise,
   onSaveAsTemplate,
+  previousByEntry,
 }: {
   workout: GymWorkout
   entries: GymWorkoutEntry[]
   exercisesById: Map<number, GymExercise>
   setsByEntry: Map<number, GymWorkoutSet[]>
+  previousByEntry: Map<number, PreviousSets>
   onDeleteEntry: (id: number) => void
   onCreateSet: (entryId: number, isWarmup: boolean, nextIndex: number) => void
   onUpdateSet: (id: number, data: { reps?: number | null; weight?: number | null }) => void
@@ -689,6 +863,7 @@ function WorkoutCard({
               entry={entry}
               exercise={exercisesById.get(entry.exerciseId)}
               sets={setsByEntry.get(entry.id) ?? []}
+              previous={previousByEntry.get(entry.id)}
               onDelete={onDeleteEntry}
               onCreateSet={onCreateSet}
               onUpdateSet={onUpdateSet}
@@ -950,6 +1125,34 @@ function LogWorkoutTab() {
     return map
   }, [allSets])
 
+  // "Previous" column: for each entry, the sets logged the last time that
+  // exercise was done (the latest earlier workout with any filled-in set).
+  const previousByEntry = React.useMemo(() => {
+    const workoutById = new Map(workouts.map(w => [w.id, w]))
+    const filled = (s: GymWorkoutSet) => s.reps != null && s.weight != null
+    const byExercise = new Map<number, GymWorkoutEntry[]>()
+    for (const e of allEntries) {
+      if (!workoutById.has(e.workoutId)) continue
+      if (!byExercise.has(e.exerciseId)) byExercise.set(e.exerciseId, [])
+      byExercise.get(e.exerciseId)!.push(e)
+    }
+    const order = (e: GymWorkoutEntry) => {
+      const w = workoutById.get(e.workoutId)!
+      return `${w.date}|${String(w.id).padStart(9, "0")}|${String(e.id).padStart(9, "0")}`
+    }
+    const result = new Map<number, PreviousSets>()
+    for (const entries of byExercise.values()) {
+      entries.sort((a, b) => order(a).localeCompare(order(b)))
+      let last: PreviousSets | undefined
+      for (const e of entries) {
+        if (last) result.set(e.id, last)
+        const sets = (setsByEntry.get(e.id) ?? []).filter(filled).sort((a, b) => a.setIndex - b.setIndex)
+        if (sets.length > 0) last = { main: sets.filter(s => !s.isWarmup), warmup: sets.filter(s => s.isWarmup) }
+      }
+    }
+    return result
+  }, [workouts, allEntries, setsByEntry])
+
   const logItems = React.useMemo<LogItem[]>(() => {
     const items: LogItem[] = [
       ...workouts.map((w): LogItem => ({ type: "workout", date: w.date, createdAt: w.createdAt, data: w })),
@@ -1137,6 +1340,7 @@ function LogWorkoutTab() {
               onUpdateWorkout={handleUpdateWorkout}
               onAddExercise={openPicker}
               onSaveAsTemplate={openSaveTemplate}
+              previousByEntry={previousByEntry}
             />
           ) : (
             <RunCard

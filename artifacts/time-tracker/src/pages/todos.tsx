@@ -209,11 +209,6 @@ function TaskItem({
         {!editing && earlierDay && (
           <span className="text-[10px] text-muted-foreground shrink-0" title={`Completed on ${task.date}`}>{earlierDay}</span>
         )}
-        {!editing && !done && task.copiedFromDate && (
-          <span className="text-[10px] text-muted-foreground/70 shrink-0" title={`Carried over from ${task.copiedFromDate}`}>
-            carried
-          </span>
-        )}
 
         {!editing && task.reminderTime && (
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0" title="Reminder time">

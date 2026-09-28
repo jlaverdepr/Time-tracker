@@ -672,7 +672,9 @@ export const UpdateTodoTaskBody = zod.object({
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
   "scheduledDate": zod.string().nullish(),
-  "reminderTime": zod.string().nullish()
+  "reminderTime": zod.string().nullish(),
+  "listId": zod.number().optional().describe('Move the task to a different list'),
+  "sortOrder": zod.number().optional()
 })
 
 export const UpdateTodoTaskResponse = zod.object({
@@ -1053,6 +1055,64 @@ export const DeleteGymRunParams = zod.object({
 })
 
 export const DeleteGymRunResponse = zod.void()
+
+
+/**
+ * @summary List all body weight logs
+ */
+export const ListGymBodyWeightLogsResponseItem = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "weightKg": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListGymBodyWeightLogsResponse = zod.array(ListGymBodyWeightLogsResponseItem)
+
+
+/**
+ * @summary Log a body weight entry
+ */
+export const CreateGymBodyWeightLogBody = zod.object({
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "weightKg": zod.number()
+})
+
+export const CreateGymBodyWeightLogResponse = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "weightKg": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a body weight log
+ */
+export const UpdateGymBodyWeightLogParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateGymBodyWeightLogBody = zod.object({
+  "date": zod.string().optional(),
+  "weightKg": zod.number().optional()
+})
+
+export const UpdateGymBodyWeightLogResponse = zod.object({
+  "id": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "weightKg": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a body weight log
+ */
+export const DeleteGymBodyWeightLogParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteGymBodyWeightLogResponse = zod.void()
 
 
 /**

@@ -1142,6 +1142,80 @@ paths:
         "404":
           description: Not found
 
+  /gym-body-weight-logs:
+    get:
+      operationId: listGymBodyWeightLogs
+      tags: [gym]
+      summary: List all body weight logs
+      responses:
+        "200":
+          description: List of body weight logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GymBodyWeightLog"
+    post:
+      operationId: createGymBodyWeightLog
+      tags: [gym]
+      summary: Log a body weight entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymBodyWeightLogInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymBodyWeightLog"
+
+  /gym-body-weight-logs/{id}:
+    patch:
+      operationId: updateGymBodyWeightLog
+      tags: [gym]
+      summary: Update a body weight log
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GymBodyWeightLogUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GymBodyWeightLog"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteGymBodyWeightLog
+      tags: [gym]
+      summary: Delete a body weight log
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
   /gym-workout-templates:
     get:
       operationId: listGymWorkoutTemplates
@@ -1556,6 +1630,11 @@ components:
           type: ["string", "null"]
         reminderTime:
           type: ["string", "null"]
+        listId:
+          type: integer
+          description: "Move the task to a different list"
+        sortOrder:
+          type: integer
 
     TodoCalendarSummaryItem:
       type: object
@@ -1784,6 +1863,38 @@ components:
           type: ["number", "null"]
         durationMinutes:
           type: ["integer", "null"]
+
+    GymBodyWeightLog:
+      type: object
+      required: [id, date, weightKg, createdAt]
+      properties:
+        id:
+          type: integer
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        weightKg:
+          type: number
+        createdAt:
+          type: string
+
+    GymBodyWeightLogInput:
+      type: object
+      required: [date, weightKg]
+      properties:
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        weightKg:
+          type: number
+
+    GymBodyWeightLogUpdate:
+      type: object
+      properties:
+        date:
+          type: string
+        weightKg:
+          type: number
 
     GymWorkoutTemplate:
       type: object

@@ -5,24 +5,15 @@
   "main": "dist-main/main.js",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "build:frontend": "pnpm --filter @workspace/time-tracker run build",
     "build:main": "node build/build-main.mjs",
-    "build": "pnpm run build:frontend && pnpm run build:main && electron-builder --config electron-builder.yml",
+    "build": "pnpm run build:main && electron-builder --config electron-builder.yml",
     "build:main:beta": "APP_CHANNEL=beta node build/build-main.mjs",
-    "build:beta": "pnpm run build:frontend && pnpm run build:main:beta && electron-builder --config electron-builder.beta.yml"
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.2.0"
+    "build:beta": "pnpm run build:main:beta && electron-builder --config electron-builder.beta.yml"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6",
     "@types/node": "catalog:",
-    "@workspace/api-server": "workspace:*",
-    "@workspace/db": "workspace:*",
-    "drizzle-orm": "catalog:",
     "electron": "^33.2.0",
     "electron-builder": "^25.1.8",
-    "esbuild": "0.27.3",
-    "express": "^5.2.1"
+    "esbuild": "0.27.3"
   }
 }

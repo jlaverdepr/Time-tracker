@@ -6,13 +6,6 @@ afterPack: build/after-pack.cjs
 files:
   - dist-main/**/*
   - package.json
-asarUnpack:
-  - "**/*.node"
-extraResources:
-  - from: ../lib/db/drizzle
-    to: drizzle
-  - from: ../artifacts/time-tracker/dist/public
-    to: public
 mac:
   icon: build/icon-beta.icns
   target:

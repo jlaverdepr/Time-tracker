@@ -12,6 +12,28 @@ export function categoryColor(category: string): string {
   return CATEGORIES.find(c => c.value === category)?.color ?? "#64748b"
 }
 
+const CATEGORY_HINTS: { keywords: string[]; category: GymExerciseCategory }[] = [
+  { keywords: ["leg", "glute", "quad", "hamstring", "calf"], category: "Lower Body" },
+  { keywords: ["chest", "back", "shoulder", "arm", "bicep", "tricep", "push", "pull"], category: "Upper Body" },
+  { keywords: ["core", "abs"], category: "Core" },
+  { keywords: ["full"], category: "Full Body" },
+]
+
+// Puts the category matching a workout's title (e.g. "Legs" -> Lower Body)
+// first in the list, so the exercise picker surfaces the most relevant
+// section without the user having to scroll past unrelated ones.
+export function orderCategoriesForTitle(title?: string | null): typeof CATEGORIES {
+  if (!title) return CATEGORIES
+  const norm = title.toLowerCase()
+  const hint = CATEGORY_HINTS.find(h => h.keywords.some(k => norm.includes(k)))
+  if (!hint) return CATEGORIES
+  const idx = CATEGORIES.findIndex(c => c.value === hint.category)
+  if (idx <= 0) return CATEGORIES
+  const reordered = [...CATEGORIES]
+  const [match] = reordered.splice(idx, 1)
+  return [match, ...reordered]
+}
+
 export function formatPace(distanceKm: number, durationMinutes: number): string | null {
   if (distanceKm <= 0 || durationMinutes <= 0) return null
   const paceMinPerKm = durationMinutes / distanceKm

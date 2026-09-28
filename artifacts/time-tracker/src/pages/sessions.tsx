@@ -1,13 +1,15 @@
 import * as React from "react"
 import { Layout } from "@/components/layout/layout"
 import { useListSessions, useListProjects, useDeleteSession, getListSessionsQueryKey, getGetStatsQueryKey, getGetCalendarQueryKey, getGetRecentSessionsQueryKey } from "@workspace/api-client-react"
+import type { Session } from "@workspace/api-client-react"
 import { format } from "date-fns"
-import { Search, Filter, Trash2 } from "lucide-react"
+import { Search, Filter, Trash2, Pencil } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
+import { EditSessionDialog } from "@/components/edit-session-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +33,7 @@ export default function Sessions() {
   const [projectIdFilter, setProjectIdFilter] = React.useState<string>("all")
   const [searchQuery, setSearchQuery] = React.useState("")
   const [sessionToDelete, setSessionToDelete] = React.useState<number | null>(null)
+  const [sessionToEdit, setSessionToEdit] = React.useState<Session | null>(null)
   
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -137,7 +140,11 @@ export default function Sessions() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredSessions.map((session) => (
-                    <tr key={session.id} className="hover:bg-muted/30 transition-colors group">
+                    <tr
+                      key={session.id}
+                      className="hover:bg-muted/30 transition-colors group cursor-pointer"
+                      onClick={() => setSessionToEdit(session)}
+                    >
                       <td className="px-6 py-4 font-medium whitespace-nowrap">
                         {format(new Date(session.date), "MMM d, yyyy")}
                       </td>
@@ -162,11 +169,19 @@ export default function Sessions() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:bg-muted"
+                            onClick={(e) => { e.stopPropagation(); setSessionToEdit(session) }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            onClick={() => setSessionToDelete(session.id)}
+                            onClick={(e) => { e.stopPropagation(); setSessionToDelete(session.id) }}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -203,6 +218,12 @@ export default function Sessions() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditSessionDialog
+        session={sessionToEdit}
+        open={!!sessionToEdit}
+        onOpenChange={(open) => !open && setSessionToEdit(null)}
+      />
     </Layout>
   )
 }

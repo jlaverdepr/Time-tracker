@@ -50,6 +50,20 @@
       "when": 1783288424806,
       "tag": "0006_common_anita_blake",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1784626296263,
+      "tag": "0007_deep_dragon_lord",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1784627516996,
+      "tag": "0008_familiar_jack_murdock",
+      "breakpoints": true
     }
   ]
 }

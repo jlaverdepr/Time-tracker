@@ -27,6 +27,9 @@ import type {
   GetSubprojectCalendarEventsParams,
   GetTodoCalendarSummaryParams,
   GetTodoDayDetailParams,
+  GymBodyWeightLog,
+  GymBodyWeightLogInput,
+  GymBodyWeightLogUpdate,
   GymExercise,
   GymExerciseInput,
   GymExerciseUpdate,
@@ -4152,6 +4155,294 @@ export const useDeleteGymRun = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getDeleteGymRunMutationOptions(options));
+    }
+
+export const getListGymBodyWeightLogsUrl = () => {
+
+
+
+
+  return `/api/gym-body-weight-logs`
+}
+
+/**
+ * @summary List all body weight logs
+ */
+export const listGymBodyWeightLogs = async ( options?: RequestInit): Promise<GymBodyWeightLog[]> => {
+
+  return customFetch<GymBodyWeightLog[]>(getListGymBodyWeightLogsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListGymBodyWeightLogsQueryKey = () => {
+    return [
+    `/api/gym-body-weight-logs`
+    ] as const;
+    }
+
+
+export const getListGymBodyWeightLogsQueryOptions = <TData = Awaited<ReturnType<typeof listGymBodyWeightLogs>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGymBodyWeightLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListGymBodyWeightLogsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listGymBodyWeightLogs>>> = ({ signal }) => listGymBodyWeightLogs({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listGymBodyWeightLogs>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListGymBodyWeightLogsQueryResult = NonNullable<Awaited<ReturnType<typeof listGymBodyWeightLogs>>>
+export type ListGymBodyWeightLogsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List all body weight logs
+ */
+
+export function useListGymBodyWeightLogs<TData = Awaited<ReturnType<typeof listGymBodyWeightLogs>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listGymBodyWeightLogs>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListGymBodyWeightLogsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateGymBodyWeightLogUrl = () => {
+
+
+
+
+  return `/api/gym-body-weight-logs`
+}
+
+/**
+ * @summary Log a body weight entry
+ */
+export const createGymBodyWeightLog = async (gymBodyWeightLogInput: GymBodyWeightLogInput, options?: RequestInit): Promise<GymBodyWeightLog> => {
+
+  return customFetch<GymBodyWeightLog>(getCreateGymBodyWeightLogUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(gymBodyWeightLogInput)
+  }
+);}
+
+
+
+
+export const getCreateGymBodyWeightLogMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createGymBodyWeightLog>>, TError,{data: BodyType<GymBodyWeightLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createGymBodyWeightLog>>, TError,{data: BodyType<GymBodyWeightLogInput>}, TContext> => {
+
+const mutationKey = ['createGymBodyWeightLog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createGymBodyWeightLog>>, {data: BodyType<GymBodyWeightLogInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createGymBodyWeightLog(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateGymBodyWeightLogMutationResult = NonNullable<Awaited<ReturnType<typeof createGymBodyWeightLog>>>
+    export type CreateGymBodyWeightLogMutationBody = BodyType<GymBodyWeightLogInput>
+    export type CreateGymBodyWeightLogMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Log a body weight entry
+ */
+export const useCreateGymBodyWeightLog = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createGymBodyWeightLog>>, TError,{data: BodyType<GymBodyWeightLogInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createGymBodyWeightLog>>,
+        TError,
+        {data: BodyType<GymBodyWeightLogInput>},
+        TContext
+      > => {
+      return useMutation(getCreateGymBodyWeightLogMutationOptions(options));
+    }
+
+export const getUpdateGymBodyWeightLogUrl = (id: number,) => {
+
+
+
+
+  return `/api/gym-body-weight-logs/${id}`
+}
+
+/**
+ * @summary Update a body weight log
+ */
+export const updateGymBodyWeightLog = async (id: number,
+    gymBodyWeightLogUpdate: GymBodyWeightLogUpdate, options?: RequestInit): Promise<GymBodyWeightLog> => {
+
+  return customFetch<GymBodyWeightLog>(getUpdateGymBodyWeightLogUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(gymBodyWeightLogUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateGymBodyWeightLogMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateGymBodyWeightLog>>, TError,{id: number;data: BodyType<GymBodyWeightLogUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateGymBodyWeightLog>>, TError,{id: number;data: BodyType<GymBodyWeightLogUpdate>}, TContext> => {
+
+const mutationKey = ['updateGymBodyWeightLog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateGymBodyWeightLog>>, {id: number;data: BodyType<GymBodyWeightLogUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateGymBodyWeightLog(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateGymBodyWeightLogMutationResult = NonNullable<Awaited<ReturnType<typeof updateGymBodyWeightLog>>>
+    export type UpdateGymBodyWeightLogMutationBody = BodyType<GymBodyWeightLogUpdate>
+    export type UpdateGymBodyWeightLogMutationError = ErrorType<void>
+
+    /**
+ * @summary Update a body weight log
+ */
+export const useUpdateGymBodyWeightLog = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateGymBodyWeightLog>>, TError,{id: number;data: BodyType<GymBodyWeightLogUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateGymBodyWeightLog>>,
+        TError,
+        {id: number;data: BodyType<GymBodyWeightLogUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateGymBodyWeightLogMutationOptions(options));
+    }
+
+export const getDeleteGymBodyWeightLogUrl = (id: number,) => {
+
+
+
+
+  return `/api/gym-body-weight-logs/${id}`
+}
+
+/**
+ * @summary Delete a body weight log
+ */
+export const deleteGymBodyWeightLog = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteGymBodyWeightLogUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteGymBodyWeightLogMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGymBodyWeightLog>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteGymBodyWeightLog>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteGymBodyWeightLog'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteGymBodyWeightLog>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteGymBodyWeightLog(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteGymBodyWeightLogMutationResult = NonNullable<Awaited<ReturnType<typeof deleteGymBodyWeightLog>>>
+
+    export type DeleteGymBodyWeightLogMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a body weight log
+ */
+export const useDeleteGymBodyWeightLog = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteGymBodyWeightLog>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteGymBodyWeightLog>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteGymBodyWeightLogMutationOptions(options));
     }
 
 export const getListGymWorkoutTemplatesUrl = () => {

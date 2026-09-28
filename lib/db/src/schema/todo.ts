@@ -54,13 +54,31 @@ export const todoTaskCompletionsTable = sqliteTable("todo_task_completions", {
   uniqueIndex("todo_task_completions_task_date_idx").on(table.taskId, table.date),
 ]);
 
+// Authoritative "was this task part of the active list on date D" log. A task
+// is active on a day if it was newly created/scheduled that day, reset by a
+// resetDaily list, or carried over from the previous day because it wasn't
+// completed yet. Recomputed in full whenever a list's tasks/completions
+// change, so past days' percentages stay accurate and stable once recorded.
+export const todoActiveLogTable = sqliteTable("todo_active_log", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  taskId: integer("task_id")
+    .notNull()
+    .references(() => todoTasksTable.id, { onDelete: "cascade" }),
+  date: text("date").notNull(), // YYYY-MM-DD
+}, (table) => [
+  uniqueIndex("todo_active_log_task_date_idx").on(table.taskId, table.date),
+]);
+
 export const insertTodoListSchema = createInsertSchema(todoListsTable).omit({ id: true, createdAt: true });
 export const insertTodoTaskSchema = createInsertSchema(todoTasksTable).omit({ id: true, createdAt: true });
 export const insertTodoTaskCompletionSchema = createInsertSchema(todoTaskCompletionsTable).omit({ id: true });
+export const insertTodoActiveLogSchema = createInsertSchema(todoActiveLogTable).omit({ id: true });
 
 export type TodoList = typeof todoListsTable.$inferSelect;
 export type TodoTask = typeof todoTasksTable.$inferSelect;
 export type TodoTaskCompletion = typeof todoTaskCompletionsTable.$inferSelect;
+export type TodoActiveLog = typeof todoActiveLogTable.$inferSelect;
 export type InsertTodoList = z.infer<typeof insertTodoListSchema>;
 export type InsertTodoTask = z.infer<typeof insertTodoTaskSchema>;
 export type InsertTodoTaskCompletion = z.infer<typeof insertTodoTaskCompletionSchema>;
+export type InsertTodoActiveLog = z.infer<typeof insertTodoActiveLogSchema>;

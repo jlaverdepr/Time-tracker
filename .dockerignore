@@ -1,0 +1,15 @@
+.git
+node_modules
+**/node_modules
+**/dist
+**/.expo
+**/.turbo
+.local
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+artifacts/mobile/ios
+artifacts/mobile/android
+desktop/release
+desktop/out

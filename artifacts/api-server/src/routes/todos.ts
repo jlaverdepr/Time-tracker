@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { todoListsTable, todoTasksTable, todoTaskCompletionsTable } from "@workspace/db/schema";
-import { eq, and, lt, isNull, isNotNull } from "drizzle-orm";
+import { todoListsTable, todoTasksTable, todoTaskCompletionsTable, todoActiveLogTable } from "@workspace/db/schema";
+import { eq, and, lt, isNull, isNotNull, inArray } from "drizzle-orm";
 import { format } from "date-fns";
 import {
   CreateTodoListBody, UpdateTodoListParams, UpdateTodoListBody, DeleteTodoListParams,
@@ -25,6 +25,61 @@ function today(): string {
 
 function taskEffectiveDate(task: TodoTask): string {
   return task.scheduledDate ?? format(task.createdAt, "yyyy-MM-dd");
+}
+
+function addDays(dateStr: string, n: number): string {
+  const d = new Date(dateStr + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + n);
+  return format(d, "yyyy-MM-dd");
+}
+
+// Recomputes the full "active task log" for a list: which tasks were part of
+// its active (pending) set on each day from the list's earliest task up to
+// today. A task is active on a day if it's a resetDaily list (recurring
+// checklist, every task active every day), was newly created/scheduled that
+// day, or was active the previous day and not completed that day (carried
+// over as pending backlog). Run in full after any change to a list's tasks
+// or completions so history stays consistent — cheap at personal-app scale,
+// and avoids the drift risk of patching the log incrementally.
+async function recomputeActiveLog(listId: number): Promise<void> {
+  const [list] = await db.select().from(todoListsTable).where(eq(todoListsTable.id, listId));
+  if (!list) return;
+
+  const tasks = await db.select().from(todoTasksTable).where(eq(todoTasksTable.listId, listId));
+  const taskIds = tasks.map(t => t.id);
+  if (taskIds.length === 0) return;
+
+  await db.delete(todoActiveLogTable).where(inArray(todoActiveLogTable.taskId, taskIds));
+
+  const todayStr = today();
+  const earliestDate = tasks.map(taskEffectiveDate).reduce((min, d) => d < min ? d : min);
+  if (earliestDate > todayStr) return; // only future-prepared tasks exist so far
+
+  const completions = await db.select().from(todoTaskCompletionsTable)
+    .where(inArray(todoTaskCompletionsTable.taskId, taskIds));
+  const completionsByDate = new Map<string, Set<number>>();
+  for (const c of completions) {
+    if (!completionsByDate.has(c.date)) completionsByDate.set(c.date, new Set());
+    completionsByDate.get(c.date)!.add(c.taskId);
+  }
+
+  const rows: { taskId: number; date: string }[] = [];
+  let prevActive = new Set<number>();
+  for (let date = earliestDate; date <= todayStr; date = addDays(date, 1)) {
+    let active: Set<number>;
+    if (list.resetDaily) {
+      active = new Set(tasks.filter(t => taskEffectiveDate(t) <= date).map(t => t.id));
+    } else {
+      const prevCompleted = completionsByDate.get(addDays(date, -1)) ?? new Set();
+      const carried = [...prevActive].filter(id => !prevCompleted.has(id));
+      const newToday = tasks.filter(t => taskEffectiveDate(t) === date).map(t => t.id);
+      active = new Set([...carried, ...newToday]);
+    }
+    for (const taskId of active) rows.push({ taskId, date });
+    prevActive = active;
+  }
+
+  if (rows.length > 0) await db.insert(todoActiveLogTable).values(rows);
 }
 
 // ─── serializers ───────────────────────────────────────────────────────────────
@@ -131,10 +186,15 @@ router.get("/todo-tasks/calendar-summary", async (req, res): Promise<void> => {
   const { startDate, endDate } = parsed.data;
   const todayStr = today();
 
-  const [lists, allTasks, allCompletions] = await Promise.all([
-    db.select().from(todoListsTable).orderBy(todoListsTable.sortOrder),
+  const lists = await db.select().from(todoListsTable).orderBy(todoListsTable.sortOrder);
+  for (const list of lists) {
+    await recomputeActiveLog(list.id);
+  }
+
+  const [allTasks, allCompletions, allActiveLog] = await Promise.all([
     db.select().from(todoTasksTable),
     db.select().from(todoTaskCompletionsTable),
+    db.select().from(todoActiveLogTable),
   ]);
 
   const results: {
@@ -155,10 +215,12 @@ router.get("/todo-tasks/calendar-summary", async (req, res): Promise<void> => {
     if (listTasks.length === 0) continue;
     const listTaskIds = new Set(listTasks.map(t => t.id));
     const listCompletions = allCompletions.filter(c => listTaskIds.has(c.taskId));
+    const listActiveLog = allActiveLog.filter(a => listTaskIds.has(a.taskId));
 
     for (const date of dates) {
-      const totalTasks = listTasks.filter(t => taskEffectiveDate(t) <= date).length;
-      const completedTasks = new Set(listCompletions.filter(c => c.date === date).map(c => c.taskId)).size;
+      const completedTaskIdsForDate = new Set(listCompletions.filter(c => c.date === date).map(c => c.taskId));
+      const totalTasks = new Set(listActiveLog.filter(a => a.date === date).map(a => a.taskId)).size;
+      const completedTasks = completedTaskIdsForDate.size;
       const preparedTasks = listTasks.filter(t => t.scheduledDate === date).length;
 
       const isFuture = date > todayStr;
@@ -197,29 +259,20 @@ router.get("/todo-tasks/day-detail", async (req, res): Promise<void> => {
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const { listId, date } = parsed.data;
 
-  const [[list], tasks, completions] = await Promise.all([
-    db.select().from(todoListsTable).where(eq(todoListsTable.id, listId)),
+  await recomputeActiveLog(listId);
+
+  const [tasks, completions, activeLog] = await Promise.all([
     db.select().from(todoTasksTable).where(eq(todoTasksTable.listId, listId))
       .orderBy(todoTasksTable.sortOrder, todoTasksTable.createdAt),
     db.select().from(todoTaskCompletionsTable).where(eq(todoTaskCompletionsTable.date, date)),
+    db.select().from(todoActiveLogTable).where(eq(todoActiveLogTable.date, date)),
   ]);
 
   const completedTaskIds = new Set(completions.map(c => c.taskId));
-  const resetDaily = list?.resetDaily ?? false;
+  const activeTaskIds = new Set(activeLog.map(a => a.taskId));
 
-  // Recurring lists are a repeating checklist: every task is "assigned" every
-  // day, checked per that day via the completions log. One-off lists don't
-  // have that daily identity, so a task only belongs to a specific day if it
-  // was completed that day, or specifically created/prepared for that day —
-  // a task still generally pending from days ago belongs to "today" (the
-  // live list), not to every day since it was added.
   const results = tasks
-    .filter(t => {
-      const effectiveDate = taskEffectiveDate(t);
-      if (effectiveDate > date) return false;
-      if (resetDaily) return true;
-      return completedTaskIds.has(t.id) || effectiveDate === date;
-    })
+    .filter(t => activeTaskIds.has(t.id))
     .map(t => ({
       taskId: t.id,
       text: t.text,
@@ -254,6 +307,7 @@ router.post("/todo-tasks/day-detail/toggle", async (req, res): Promise<void> => 
       .where(eq(todoTasksTable.id, taskId));
   }
 
+  await recomputeActiveLog(task.listId);
   res.json(ToggleTodoDayDetailTaskResponse.parse({ taskId, text: task.text, completed }));
 });
 
@@ -266,16 +320,21 @@ router.get("/todo-tasks", async (req, res): Promise<void> => {
   // Opportunistic sweep: lists with autoClearCompleted soft-clear any task
   // completed on a previous day that hasn't been cleared yet. Self-heals
   // whenever the app is next opened; no background job required.
-  const autoClearLists = await db.select().from(todoListsTable).where(eq(todoListsTable.autoClearCompleted, true));
-  for (const list of autoClearLists) {
-    await db.update(todoTasksTable)
-      .set({ clearedAt: new Date() })
-      .where(and(
-        eq(todoTasksTable.listId, list.id),
-        isNotNull(todoTasksTable.completedDate),
-        lt(todoTasksTable.completedDate, todayStr),
-        isNull(todoTasksTable.clearedAt),
-      ));
+  const allLists = await db.select().from(todoListsTable);
+  for (const list of allLists) {
+    if (list.autoClearCompleted) {
+      await db.update(todoTasksTable)
+        .set({ clearedAt: new Date() })
+        .where(and(
+          eq(todoTasksTable.listId, list.id),
+          isNotNull(todoTasksTable.completedDate),
+          lt(todoTasksTable.completedDate, todayStr),
+          isNull(todoTasksTable.clearedAt),
+        ));
+    }
+    // Same self-healing idea for the active-task log: catches up any days
+    // that elapsed with the app closed, with no mutation to trigger it.
+    await recomputeActiveLog(list.id);
   }
 
   const conditions = [];
@@ -312,6 +371,7 @@ router.post("/todo-tasks", async (req, res): Promise<void> => {
     reminderTime: parsed.data.reminderTime ?? null,
     sortOrder: 0,
   }).returning();
+  await recomputeActiveLog(row.listId);
   res.status(201).json(CreateTodoTaskResponse.parse(serializeTask(row)));
 });
 
@@ -321,24 +381,35 @@ router.patch("/todo-tasks/:id", async (req, res): Promise<void> => {
   const parsed = UpdateTodoTaskBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const existing = await db.select().from(todoTasksTable).where(eq(todoTasksTable.id, params.data.id));
+  const previousListId = existing[0]?.listId;
+
   const updates: Partial<typeof todoTasksTable.$inferInsert> = {};
   if (parsed.data.text !== undefined) updates.text = parsed.data.text;
   if ("projectId" in parsed.data) updates.projectId = parsed.data.projectId ?? null;
   if ("subprojectId" in parsed.data) updates.subprojectId = parsed.data.subprojectId ?? null;
   if ("scheduledDate" in parsed.data) updates.scheduledDate = parsed.data.scheduledDate ?? null;
   if ("reminderTime" in parsed.data) updates.reminderTime = parsed.data.reminderTime ?? null;
+  if (parsed.data.listId !== undefined) updates.listId = parsed.data.listId;
+  if (parsed.data.sortOrder !== undefined) updates.sortOrder = parsed.data.sortOrder;
 
   if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Nothing to update" }); return; }
   const [row] = await db.update(todoTasksTable).set(updates)
     .where(eq(todoTasksTable.id, params.data.id)).returning();
   if (!row) { res.status(404).json({ error: "Task not found" }); return; }
+  if ("scheduledDate" in parsed.data) await recomputeActiveLog(row.listId);
+  if (parsed.data.listId !== undefined && previousListId !== undefined && previousListId !== row.listId) {
+    await recomputeActiveLog(previousListId);
+    await recomputeActiveLog(row.listId);
+  }
   res.json(UpdateTodoTaskResponse.parse(serializeTask(row)));
 });
 
 router.delete("/todo-tasks/:id", async (req, res): Promise<void> => {
   const parsed = DeleteTodoTaskParams.safeParse(req.params);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  await db.delete(todoTasksTable).where(eq(todoTasksTable.id, parsed.data.id));
+  const [row] = await db.delete(todoTasksTable).where(eq(todoTasksTable.id, parsed.data.id)).returning();
+  if (row) await recomputeActiveLog(row.listId);
   res.status(204).send();
 });
 
@@ -355,6 +426,7 @@ router.post("/todo-tasks/:id/complete", async (req, res): Promise<void> => {
   await db.insert(todoTaskCompletionsTable)
     .values({ taskId: row.id, date: todayStr, completedAt: now })
     .onConflictDoNothing();
+  await recomputeActiveLog(row.listId);
   res.json(CompleteTodoTaskResponse.parse(serializeTask(row)));
 });
 
@@ -370,6 +442,7 @@ router.post("/todo-tasks/:id/uncomplete", async (req, res): Promise<void> => {
   // (still visible because auto-clear is off) keeps that day's history intact.
   await db.delete(todoTaskCompletionsTable)
     .where(and(eq(todoTaskCompletionsTable.taskId, row.id), eq(todoTaskCompletionsTable.date, today())));
+  await recomputeActiveLog(row.listId);
   res.json(UncompleteTodoTaskResponse.parse(serializeTask(row)));
 });
 

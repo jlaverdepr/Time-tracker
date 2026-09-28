@@ -1,0 +1,33 @@
+# `fly launch` will offer to regenerate parts of this interactively (app
+# name, region, org) — that's fine, just keep the [build], [env],
+# [[mounts]], and [http_service] sections pointed at this Dockerfile /
+# /data volume / :8080 port. See DEPLOY.md.
+app = "CHANGE-ME-focustime-server"
+primary_region = "sjc"
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  DB_PATH = "/data/time-tracker.sqlite"
+  MIGRATIONS_DIR = "/repo/lib/db/drizzle"
+  STATIC_DIR = "/repo/artifacts/time-tracker/dist/public"
+
+[[mounts]]
+  source = "focustime_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/healthz"

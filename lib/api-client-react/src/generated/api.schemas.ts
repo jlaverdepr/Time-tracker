@@ -268,6 +268,9 @@ export interface TodoTaskUpdate {
   scheduledDate?: string | null;
   /** @nullable */
   reminderTime?: string | null;
+  /** Move the task to a different list */
+  listId?: number;
+  sortOrder?: number;
 }
 
 export interface TodoCalendarSummaryItem {
@@ -421,6 +424,25 @@ export interface GymRunUpdate {
   distanceKm?: number | null;
   /** @nullable */
   durationMinutes?: number | null;
+}
+
+export interface GymBodyWeightLog {
+  id: number;
+  /** YYYY-MM-DD */
+  date: string;
+  weightKg: number;
+  createdAt: string;
+}
+
+export interface GymBodyWeightLogInput {
+  /** YYYY-MM-DD */
+  date: string;
+  weightKg: number;
+}
+
+export interface GymBodyWeightLogUpdate {
+  date?: string;
+  weightKg?: number;
 }
 
 export interface GymWorkoutTemplate {

@@ -5,14 +5,15 @@ import {
   useListGymExercises, useCreateGymExercise, useUpdateGymExercise, useDeleteGymExercise,
   useListGymWorkouts, useCreateGymWorkout, useUpdateGymWorkout, useDeleteGymWorkout,
   useListGymWorkoutEntries, useCreateGymWorkoutEntry, useDeleteGymWorkoutEntry,
-  useListGymWorkoutSets, useCreateGymWorkoutSet, useUpdateGymWorkoutSet,
+  useListGymWorkoutSets, useCreateGymWorkoutSet, useUpdateGymWorkoutSet, useDeleteGymWorkoutSet,
   useListGymRuns, useCreateGymRun, useUpdateGymRun, useDeleteGymRun,
+  useListGymBodyWeightLogs, useCreateGymBodyWeightLog, useUpdateGymBodyWeightLog, useDeleteGymBodyWeightLog,
   useListGymWorkoutTemplates, useCreateGymWorkoutTemplate, useDeleteGymWorkoutTemplate,
   getListGymExercisesQueryKey, getListGymWorkoutsQueryKey, getListGymWorkoutEntriesQueryKey, getListGymWorkoutSetsQueryKey,
-  getListGymRunsQueryKey, getListGymWorkoutTemplatesQueryKey,
+  getListGymRunsQueryKey, getListGymBodyWeightLogsQueryKey, getListGymWorkoutTemplatesQueryKey,
 } from "@workspace/api-client-react"
 import type {
-  GymExercise, GymExerciseCategory, GymWorkout, GymWorkoutEntry, GymWorkoutSet, GymRun, GymWorkoutTemplate,
+  GymExercise, GymExerciseCategory, GymWorkout, GymWorkoutEntry, GymWorkoutSet, GymRun, GymBodyWeightLog, GymWorkoutTemplate,
 } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
@@ -23,9 +24,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel } from "@/components/ui/select"
 import { Plus, Trash2, Pencil, Check, X, Dumbbell, ListChecks, Trophy, Footprints, Save, LineChart as LineChartIcon } from "lucide-react"
-import { LineChart, Line, ResponsiveContainer, Tooltip } from "recharts"
+import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts"
 import { cn } from "@/lib/utils"
-import { CATEGORIES, categoryColor, formatPace, formatSpeed, sanitizeNumericInput } from "@/lib/gym-utils"
+import { CATEGORIES, categoryColor, formatPace, formatSpeed, orderCategoriesForTitle, sanitizeNumericInput } from "@/lib/gym-utils"
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -238,22 +239,44 @@ function SetInput({
   index,
   onUpdate,
   onToggleFailure,
+  onDelete,
+  onTabNext,
+  focusRequest,
 }: {
   set: GymWorkoutSet
   index: number
   onUpdate: (id: number, data: { reps?: number | null; weight?: number | null }) => void
   onToggleFailure: (id: number, next: boolean) => void
+  onDelete: (id: number) => void
+  onTabNext: (id: number) => boolean
+  focusRequest: { id: number } | null
 }) {
   const hasBoth = set.reps != null && set.weight != null
   const [editing, setEditing] = React.useState(!hasBoth)
   const [repsText, setRepsText] = React.useState(set.reps != null ? String(set.reps) : "")
   const [weightText, setWeightText] = React.useState(set.weight != null ? String(set.weight) : "")
+  const repsInputRef = React.useRef<HTMLInputElement>(null)
 
   React.useEffect(() => {
     setRepsText(set.reps != null ? String(set.reps) : "")
     setWeightText(set.weight != null ? String(set.weight) : "")
     if (set.reps != null && set.weight != null) setEditing(false)
   }, [set.reps, set.weight])
+
+  // A sibling set's Tab handler asked this set to become the next stop:
+  // open it for editing and focus its reps field once it's on the page.
+  // Keyed on the focusRequest object identity (not just the id) so asking
+  // for the same set twice in a row still re-triggers the focus.
+  React.useEffect(() => {
+    if (focusRequest?.id === set.id) setEditing(true)
+  }, [focusRequest, set.id])
+
+  React.useEffect(() => {
+    if (focusRequest?.id === set.id && editing) {
+      repsInputRef.current?.focus()
+      repsInputRef.current?.select()
+    }
+  }, [focusRequest, set.id, editing])
 
   function commit() {
     const repsTrim = repsText.trim()
@@ -268,6 +291,16 @@ function SetInput({
     if (repsVal != null && weightVal != null) setEditing(false)
   }
 
+  function handleWeightKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); return }
+    if (e.key === "Tab" && !e.shiftKey) {
+      // Only take over Tab when there's somewhere for it to go (another set,
+      // or room to add one) — otherwise let the browser tab out normally.
+      if (onTabNext(set.id)) e.preventDefault()
+      commit()
+    }
+  }
+
   const inputClass = cn(
     "h-7 text-center text-xs rounded-md border bg-background focus:outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/30",
     "[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
@@ -279,6 +312,7 @@ function SetInput({
       {editing ? (
         <div className="flex items-center gap-1">
           <input
+            ref={repsInputRef}
             type="text" inputMode="numeric"
             value={repsText}
             onChange={e => setRepsText(sanitizeNumericInput(e.target.value, false))}
@@ -293,7 +327,7 @@ function SetInput({
             value={weightText}
             onChange={e => setWeightText(sanitizeNumericInput(e.target.value, true))}
             onBlur={commit}
-            onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur() }}
+            onKeyDown={handleWeightKeyDown}
             placeholder="kg"
             className={cn(inputClass, "w-14")}
           />
@@ -326,6 +360,14 @@ function SetInput({
         >
           F
         </button>
+        <button
+          type="button"
+          onClick={() => onDelete(set.id)}
+          title="Delete set"
+          className="h-4 w-4 rounded-full bg-muted flex items-center justify-center hover:bg-destructive/10 hover:text-destructive"
+        >
+          <Trash2 className="h-2.5 w-2.5" />
+        </button>
       </div>
     </div>
   )
@@ -338,6 +380,7 @@ function SetGroup({
   onCreateSet,
   onUpdateSet,
   onToggleFailure,
+  onDeleteSet,
 }: {
   sets: GymWorkoutSet[]
   isWarmup: boolean
@@ -345,14 +388,53 @@ function SetGroup({
   onCreateSet: (entryId: number, isWarmup: boolean, nextIndex: number) => void
   onUpdateSet: (id: number, data: { reps?: number | null; weight?: number | null }) => void
   onToggleFailure: (id: number, next: boolean) => void
+  onDeleteSet: (id: number) => void
 }) {
   const sorted = [...sets].sort((a, b) => a.setIndex - b.setIndex)
   const canAddMore = sorted.length < MAX_SETS
 
+  const [focusRequest, setFocusRequest] = React.useState<{ id: number } | null>(null)
+  const prevIdsRef = React.useRef<Set<number>>(new Set(sorted.map(s => s.id)))
+  const pendingNewSetRef = React.useRef(false)
+
+  // Once the newly-created set (from a Tab-past-the-last-set request) shows
+  // up in the sets list, hand focus to it — it's the one with an id we
+  // haven't seen before.
+  React.useEffect(() => {
+    const currentIds = new Set(sorted.map(s => s.id))
+    if (pendingNewSetRef.current) {
+      const newSet = sorted.find(s => !prevIdsRef.current.has(s.id))
+      if (newSet) {
+        setFocusRequest({ id: newSet.id })
+        pendingNewSetRef.current = false
+      }
+    }
+    prevIdsRef.current = currentIds
+  }, [sets])
+
+  function handleTabNext(fromId: number): boolean {
+    const idx = sorted.findIndex(s => s.id === fromId)
+    if (idx === -1) return false
+    if (idx < sorted.length - 1) {
+      setFocusRequest({ id: sorted[idx + 1].id })
+      return true
+    }
+    if (canAddMore) {
+      pendingNewSetRef.current = true
+      onCreateSet(entryId, isWarmup, sorted.length + 1)
+      return true
+    }
+    return false
+  }
+
   return (
     <div className="flex items-end gap-1.5 justify-end">
       {sorted.map((s, i) => (
-        <SetInput key={s.id} set={s} index={i + 1} onUpdate={onUpdateSet} onToggleFailure={onToggleFailure} />
+        <SetInput
+          key={s.id} set={s} index={i + 1}
+          onUpdate={onUpdateSet} onToggleFailure={onToggleFailure} onDelete={onDeleteSet}
+          onTabNext={handleTabNext} focusRequest={focusRequest}
+        />
       ))}
       {canAddMore && (
         <button
@@ -376,6 +458,7 @@ function WorkoutEntryRow({
   onCreateSet,
   onUpdateSet,
   onToggleFailure,
+  onDeleteSet,
 }: {
   entry: GymWorkoutEntry
   exercise: GymExercise | undefined
@@ -384,6 +467,7 @@ function WorkoutEntryRow({
   onCreateSet: (entryId: number, isWarmup: boolean, nextIndex: number) => void
   onUpdateSet: (id: number, data: { reps?: number | null; weight?: number | null }) => void
   onToggleFailure: (id: number, next: boolean) => void
+  onDeleteSet: (id: number) => void
 }) {
   const [warmupOpen, setWarmupOpen] = React.useState(false)
   const mainSets = sets.filter(s => !s.isWarmup)
@@ -416,12 +500,12 @@ function WorkoutEntryRow({
 
       <div className="flex-1 flex flex-col justify-center gap-1.5 min-w-0">
         <SetGroup sets={mainSets} isWarmup={false} entryId={entry.id}
-          onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} />
+          onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
         {warmupOpen ? (
           <div className="flex items-end gap-2 justify-end">
             <span className="text-[10px] text-muted-foreground shrink-0 pb-1.5">Warmup</span>
             <SetGroup sets={warmupSets} isWarmup={true} entryId={entry.id}
-              onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} />
+              onCreateSet={onCreateSet} onUpdateSet={onUpdateSet} onToggleFailure={onToggleFailure} onDeleteSet={onDeleteSet} />
             <button onClick={() => setWarmupOpen(false)} className="shrink-0 pb-1.5" title="Done editing warmup">
               <Check className="h-4 w-4 text-emerald-600" />
             </button>
@@ -522,6 +606,7 @@ function WorkoutCard({
   onCreateSet,
   onUpdateSet,
   onToggleFailure,
+  onDeleteSet,
   onDeleteWorkout,
   onUpdateWorkout,
   onAddExercise,
@@ -535,6 +620,7 @@ function WorkoutCard({
   onCreateSet: (entryId: number, isWarmup: boolean, nextIndex: number) => void
   onUpdateSet: (id: number, data: { reps?: number | null; weight?: number | null }) => void
   onToggleFailure: (id: number, next: boolean) => void
+  onDeleteSet: (id: number) => void
   onDeleteWorkout: (id: number) => void
   onUpdateWorkout: (id: number, data: { title: string | null; date: string }) => void
   onAddExercise: (workoutId: number) => void
@@ -605,6 +691,7 @@ function WorkoutCard({
               onCreateSet={onCreateSet}
               onUpdateSet={onUpdateSet}
               onToggleFailure={onToggleFailure}
+              onDeleteSet={onDeleteSet}
             />
           ))
         )}
@@ -785,6 +872,7 @@ function LogWorkoutTab() {
   const deleteEntry = useDeleteGymWorkoutEntry()
   const createSet = useCreateGymWorkoutSet()
   const updateSet = useUpdateGymWorkoutSet()
+  const deleteSet = useDeleteGymWorkoutSet()
   const createRun = useCreateGymRun()
   const updateRun = useUpdateGymRun()
   const deleteRun = useDeleteGymRun()
@@ -865,6 +953,9 @@ function LogWorkoutTab() {
     setPickerOpen(true)
   }
 
+  const pickerWorkout = workouts.find(w => w.id === pickerWorkoutId)
+  const pickerCategories = orderCategoriesForTitle(pickerWorkout?.title)
+
   function handleConfirmExercise() {
     if (!pickerExerciseId || !pickerWorkoutId) return
     createEntry.mutate({ data: { workoutId: pickerWorkoutId, exerciseId: Number(pickerExerciseId) } }, {
@@ -888,6 +979,10 @@ function LogWorkoutTab() {
 
   function handleToggleFailure(id: number, next: boolean) {
     updateSet.mutate({ id, data: { failure: next } }, { onSuccess: () => invalidateSets() })
+  }
+
+  function handleDeleteSet(id: number) {
+    deleteSet.mutate({ id }, { onSuccess: () => invalidateSets() })
   }
 
   function handleUpdateWorkout(id: number, data: { title: string | null; date: string }) {
@@ -1016,6 +1111,7 @@ function LogWorkoutTab() {
               onCreateSet={handleCreateSet}
               onUpdateSet={handleUpdateSet}
               onToggleFailure={handleToggleFailure}
+              onDeleteSet={handleDeleteSet}
               onDeleteWorkout={setDeleteWorkoutId}
               onUpdateWorkout={handleUpdateWorkout}
               onAddExercise={openPicker}
@@ -1047,7 +1143,7 @@ function LogWorkoutTab() {
                 <SelectValue placeholder="Select an exercise…" />
               </SelectTrigger>
               <SelectContent>
-                {CATEGORIES.filter(c => byCategory.has(c.value)).map(c => (
+                {pickerCategories.filter(c => byCategory.has(c.value)).map(c => (
                   <SelectGroup key={c.value}>
                     <SelectLabel>{c.value}</SelectLabel>
                     {byCategory.get(c.value)!.map(ex => (
@@ -1203,18 +1299,204 @@ function LogWorkoutTab() {
   )
 }
 
+// ── weight tracker tab ───────────────────────────────────────────────────────────
+
+function WeightTrackerChart({ data, color }: { data: { date: string; value: number }[]; color: string }) {
+  if (data.length < 2) return null
+  return (
+    <div className="h-48">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+          <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
+          <Tooltip
+            content={({ active, payload }) => {
+              if (!active || !payload?.[0]) return null
+              const point = payload[0].payload as { date: string; value: number }
+              return (
+                <div className="bg-popover border rounded-md px-2 py-1 text-xs shadow-md">
+                  {point.value} kg — {format(parseISO(point.date), "MMM d, yyyy")}
+                </div>
+              )
+            }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+function WeightLogRow({ log, onUpdate, onDelete }: {
+  log: GymBodyWeightLog
+  onUpdate: (id: number, data: { date?: string; weightKg?: number }) => void
+  onDelete: (id: number) => void
+}) {
+  const [editing, setEditing] = React.useState(false)
+  const [date, setDate] = React.useState(log.date)
+  const [weightText, setWeightText] = React.useState(String(log.weightKg))
+
+  React.useEffect(() => {
+    setDate(log.date)
+    setWeightText(String(log.weightKg))
+  }, [log.date, log.weightKg])
+
+  function commit() {
+    const trimmed = weightText.trim()
+    const weightVal = trimmed === "" ? NaN : Number(trimmed)
+    if (Number.isNaN(weightVal)) return
+    if (date !== log.date || weightVal !== log.weightKg) {
+      onUpdate(log.id, { date, weightKg: weightVal })
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 rounded-lg border bg-card">
+        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-8 flex-1" />
+        <Input
+          type="text" inputMode="decimal"
+          value={weightText}
+          onChange={e => setWeightText(sanitizeNumericInput(e.target.value, true))}
+          className="h-8 w-20"
+        />
+        <Button size="sm" variant="ghost" onClick={commit}><Check className="h-4 w-4 text-emerald-600" /></Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2 rounded-lg border bg-card group">
+      <span className="text-sm font-medium flex-1">{format(parseISO(log.date), "EEE, MMM d, yyyy")}</span>
+      <span className="text-sm font-semibold tabular-nums">{log.weightKg} kg</span>
+      <button onClick={() => setEditing(true)} title="Edit"
+        className="p-1 rounded hover:bg-muted opacity-0 group-hover:opacity-100 transition-opacity">
+        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+      </button>
+      <button onClick={() => onDelete(log.id)} title="Delete"
+        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity">
+        <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+      </button>
+    </div>
+  )
+}
+
+function WeightTrackerTab() {
+  const { data: logs = [], isLoading } = useListGymBodyWeightLogs()
+  const queryClient = useQueryClient()
+  const createLog = useCreateGymBodyWeightLog()
+  const updateLog = useUpdateGymBodyWeightLog()
+  const deleteLog = useDeleteGymBodyWeightLog()
+
+  const [date, setDate] = React.useState(getToday())
+  const [weightText, setWeightText] = React.useState("")
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: getListGymBodyWeightLogsQueryKey() })
+  }
+
+  function handleAdd(e: React.FormEvent) {
+    e.preventDefault()
+    const trimmed = weightText.trim()
+    if (trimmed === "") return
+    const weightVal = Number(trimmed)
+    if (Number.isNaN(weightVal)) return
+    createLog.mutate({ data: { date, weightKg: weightVal } }, {
+      onSuccess: () => { invalidate(); setWeightText("") },
+    })
+  }
+
+  function handleUpdate(id: number, data: { date?: string; weightKg?: number }) {
+    updateLog.mutate({ id, data }, { onSuccess: invalidate })
+  }
+
+  function handleDelete(id: number) {
+    deleteLog.mutate({ id }, { onSuccess: invalidate })
+  }
+
+  const sortedAsc = [...logs].sort((a, b) => a.date.localeCompare(b.date))
+  const sortedDesc = [...sortedAsc].reverse()
+  const chartData = sortedAsc.map(l => ({ date: l.date, value: l.weightKg }))
+  const latest = sortedDesc[0]
+  const first = sortedAsc[0]
+  const change = latest && first && latest.id !== first.id ? latest.weightKg - first.weightKg : null
+
+  if (isLoading) {
+    return <div className="text-center text-muted-foreground py-12">Loading weight logs...</div>
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <form onSubmit={handleAdd} className="flex items-center gap-2 p-3 rounded-lg border border-dashed bg-muted/20">
+        <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-9 w-auto" />
+        <Input
+          type="text" inputMode="decimal"
+          value={weightText}
+          onChange={e => setWeightText(sanitizeNumericInput(e.target.value, true))}
+          placeholder="Weight (kg)"
+          className="h-9 flex-1"
+        />
+        <Button type="submit" size="sm" disabled={weightText.trim() === ""} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" />
+          Log
+        </Button>
+      </form>
+
+      {logs.length === 0 ? (
+        <div className="border border-dashed rounded-2xl py-24 flex flex-col items-center gap-4 text-muted-foreground">
+          <LineChartIcon className="h-12 w-12 opacity-20" />
+          <div className="text-center">
+            <p className="font-semibold text-foreground">No weight logs yet</p>
+            <p className="text-sm">Log your weight above to start tracking it over time.</p>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="bg-card border rounded-2xl shadow-sm p-4 flex flex-col gap-3">
+            <div className="flex items-baseline gap-4">
+              {latest && (
+                <div>
+                  <span className="text-3xl font-bold tabular-nums">{latest.weightKg}</span>
+                  <span className="text-sm text-muted-foreground ml-1">kg current</span>
+                </div>
+              )}
+              {change != null && first && (
+                <span className={cn(
+                  "text-sm font-medium tabular-nums",
+                  change < 0 ? "text-emerald-600" : change > 0 ? "text-amber-600" : "text-muted-foreground",
+                )}>
+                  {change > 0 ? "+" : ""}{change.toFixed(1)} kg since {format(parseISO(first.date), "MMM d")}
+                </span>
+              )}
+            </div>
+            <WeightTrackerChart data={chartData} color="#6366f1" />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            {sortedDesc.map(log => (
+              <WeightLogRow key={log.id} log={log} onUpdate={handleUpdate} onDelete={handleDelete} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ── personal records tab ────────────────────────────────────────────────────────
+
+type PersonalRecordMode = "weight" | "volume"
 
 type PersonalRecord = {
   exercise: GymExercise
   weight: number
   reps: number | null
+  volume: number | null
   date: string
 }
 
-type ProgressPoint = { date: string; weight: number }
+type ProgressPoint = { date: string; value: number }
 
-function ExerciseProgressChart({ data, color }: { data: ProgressPoint[]; color: string }) {
+function ExerciseProgressChart({ data, color, unit }: { data: ProgressPoint[]; color: string; unit: string }) {
   if (data.length < 2) return null
   return (
     <div className="flex flex-col gap-1">
@@ -1225,14 +1507,14 @@ function ExerciseProgressChart({ data, color }: { data: ProgressPoint[]; color: 
       <div className="h-12">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
-            <Line type="monotone" dataKey="weight" stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={false} isAnimationActive={false} />
             <Tooltip
               content={({ active, payload }) => {
                 if (!active || !payload?.[0]) return null
                 const point = payload[0].payload as ProgressPoint
                 return (
                   <div className="bg-popover border rounded-md px-2 py-1 text-xs shadow-md">
-                    {point.weight} kg — {format(parseISO(point.date), "MMM d")}
+                    {point.value} {unit} — {format(parseISO(point.date), "MMM d")}
                   </div>
                 )
               }}
@@ -1244,7 +1526,7 @@ function ExerciseProgressChart({ data, color }: { data: ProgressPoint[]; color: 
   )
 }
 
-function PersonalRecordCard({ record, history }: { record: PersonalRecord; history: ProgressPoint[] }) {
+function PersonalRecordCard({ record, history, mode }: { record: PersonalRecord; history: ProgressPoint[]; mode: PersonalRecordMode }) {
   const color = categoryColor(record.exercise.category)
   return (
     <div
@@ -1256,29 +1538,115 @@ function PersonalRecordCard({ record, history }: { record: PersonalRecord; histo
         <span className="text-sm font-medium flex-1 truncate">{record.exercise.name}</span>
         <Trophy className="h-4 w-4 shrink-0" style={{ color }} />
       </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className="text-3xl font-bold tabular-nums" style={{ color }}>{record.weight}</span>
-        <span className="text-sm text-muted-foreground">kg</span>
-        {record.reps != null && (
-          <span className="text-sm text-muted-foreground ml-1">x {record.reps} reps</span>
-        )}
-      </div>
+      {mode === "weight" ? (
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-3xl font-bold tabular-nums" style={{ color }}>{record.weight}</span>
+          <span className="text-sm text-muted-foreground">kg</span>
+          {record.reps != null && (
+            <span className="text-sm text-muted-foreground ml-1">x {record.reps} reps</span>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-3xl font-bold tabular-nums" style={{ color }}>{record.volume}</span>
+          <span className="text-sm text-muted-foreground">kg volume</span>
+          <span className="text-sm text-muted-foreground ml-1">({record.reps} x {record.weight} kg)</span>
+        </div>
+      )}
       <span className="text-xs text-muted-foreground">{format(parseISO(record.date), "MMM d, yyyy")}</span>
-      <ExerciseProgressChart data={history} color={color} />
+      <ExerciseProgressChart data={history} color={color} unit={mode === "weight" ? "kg" : "kg volume"} />
+    </div>
+  )
+}
+
+function ExerciseProgressPanel({ exercises, historyByExercise, mode }: {
+  exercises: GymExercise[]
+  historyByExercise: Map<number, ProgressPoint[]>
+  mode: PersonalRecordMode
+}) {
+  const exercisesWithHistory = React.useMemo(() => (
+    exercises
+      .filter(ex => (historyByExercise.get(ex.id) ?? []).length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name))
+  ), [exercises, historyByExercise])
+
+  const [selectedId, setSelectedId] = React.useState<number | null>(null)
+
+  React.useEffect(() => {
+    if (exercisesWithHistory.length === 0) { setSelectedId(null); return }
+    if (selectedId == null || !exercisesWithHistory.some(ex => ex.id === selectedId)) {
+      setSelectedId(exercisesWithHistory[0].id)
+    }
+  }, [exercisesWithHistory, selectedId])
+
+  if (exercisesWithHistory.length === 0) return null
+
+  const selected = exercisesWithHistory.find(ex => ex.id === selectedId) ?? exercisesWithHistory[0]
+  const data = historyByExercise.get(selected.id) ?? []
+  const color = categoryColor(selected.category)
+  const unit = mode === "weight" ? "kg" : "kg volume"
+
+  return (
+    <div className="bg-card border rounded-2xl shadow-sm p-4 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <h3 className="text-sm font-semibold flex items-center gap-2">
+          <LineChartIcon className="h-4 w-4 text-muted-foreground" />
+          Exercise Progress
+        </h3>
+        <Select value={String(selected.id)} onValueChange={v => setSelectedId(Number(v))}>
+          <SelectTrigger className="h-8 w-[200px] text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {exercisesWithHistory.map(ex => (
+              <SelectItem key={ex.id} value={String(ex.id)}>{ex.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      {data.length < 2 ? (
+        <p className="text-xs text-muted-foreground py-8 text-center">
+          Log this exercise on at least two different days to see a trend.
+        </p>
+      ) : (
+        <div className="h-56">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+              <XAxis dataKey="date" tickFormatter={d => format(parseISO(d), "MMM d")} tick={{ fontSize: 10 }} minTickGap={20} />
+              <YAxis tick={{ fontSize: 10 }} width={36} domain={["auto", "auto"]} />
+              <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.[0]) return null
+                  const point = payload[0].payload as ProgressPoint
+                  return (
+                    <div className="bg-popover border rounded-md px-2 py-1 text-xs shadow-md">
+                      {point.value} {unit} — {format(parseISO(point.date), "MMM d, yyyy")}
+                    </div>
+                  )
+                }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   )
 }
 
 function PersonalRecordsTab() {
+  const [mode, setMode] = React.useState<PersonalRecordMode>("weight")
   const { data: exercises = [], isLoading: exercisesLoading } = useListGymExercises()
   const { data: entries = [] } = useListGymWorkoutEntries()
   const { data: sets = [] } = useListGymWorkoutSets()
   const { data: workouts = [] } = useListGymWorkouts()
 
-  const records = React.useMemo(() => {
+  const { weightRecords, volumeRecords } = React.useMemo(() => {
     const workoutById = new Map(workouts.map(w => [w.id, w]))
     const entryById = new Map(entries.map(e => [e.id, e]))
-    const best = new Map<number, PersonalRecord>()
+    const bestWeight = new Map<number, PersonalRecord>()
+    const bestVolume = new Map<number, PersonalRecord>()
 
     for (const set of sets) {
       if (set.weight == null) continue
@@ -1288,14 +1656,29 @@ function PersonalRecordsTab() {
       if (!exercise) continue
       const workout = workoutById.get(entry.workoutId)
       const date = workout?.date ?? ""
-      const current = best.get(exercise.id)
-      if (!current || set.weight > current.weight) {
-        best.set(exercise.id, { exercise, weight: set.weight, reps: set.reps ?? null, date })
+
+      const currentWeight = bestWeight.get(exercise.id)
+      if (!currentWeight || set.weight > currentWeight.weight) {
+        bestWeight.set(exercise.id, { exercise, weight: set.weight, reps: set.reps ?? null, volume: null, date })
+      }
+
+      if (set.reps != null) {
+        const volume = set.weight * set.reps
+        const currentVolume = bestVolume.get(exercise.id)
+        if (!currentVolume || volume > (currentVolume.volume ?? 0)) {
+          bestVolume.set(exercise.id, { exercise, weight: set.weight, reps: set.reps, volume, date })
+        }
       }
     }
 
-    return [...best.values()].sort((a, b) => a.exercise.name.localeCompare(b.exercise.name))
+    const byName = (a: PersonalRecord, b: PersonalRecord) => a.exercise.name.localeCompare(b.exercise.name)
+    return {
+      weightRecords: [...bestWeight.values()].sort(byName),
+      volumeRecords: [...bestVolume.values()].sort(byName),
+    }
   }, [exercises, entries, sets, workouts])
+
+  const records = mode === "weight" ? weightRecords : volumeRecords
 
   const historyByExercise = React.useMemo(() => {
     const workoutById = new Map(workouts.map(w => [w.id, w]))
@@ -1304,47 +1687,81 @@ function PersonalRecordsTab() {
 
     for (const set of sets) {
       if (set.weight == null) continue
+      if (mode === "volume" && set.reps == null) continue
       const entry = entryById.get(set.entryId)
       if (!entry) continue
       const workout = workoutById.get(entry.workoutId)
       if (!workout) continue
+      const value = mode === "weight" ? set.weight : set.weight * set.reps!
       const key = `${entry.exerciseId}|${workout.date}`
       const current = maxByExerciseDate.get(key)
-      if (current === undefined || set.weight > current) maxByExerciseDate.set(key, set.weight)
+      if (current === undefined || value > current) maxByExerciseDate.set(key, value)
     }
 
     const map = new Map<number, ProgressPoint[]>()
-    for (const [key, weight] of maxByExerciseDate) {
+    for (const [key, value] of maxByExerciseDate) {
       const [exerciseIdStr, date] = key.split("|")
       const exerciseId = Number(exerciseIdStr)
       if (!map.has(exerciseId)) map.set(exerciseId, [])
-      map.get(exerciseId)!.push({ date, weight })
+      map.get(exerciseId)!.push({ date, value })
     }
     for (const points of map.values()) points.sort((a, b) => a.date.localeCompare(b.date))
     return map
-  }, [entries, sets, workouts])
+  }, [entries, sets, workouts, mode])
 
   if (exercisesLoading) {
     return <div className="text-center text-muted-foreground py-12">Loading records...</div>
   }
 
-  if (records.length === 0) {
-    return (
-      <div className="border border-dashed rounded-2xl py-24 flex flex-col items-center gap-4 text-muted-foreground">
-        <Trophy className="h-12 w-12 opacity-20" />
-        <div className="text-center">
-          <p className="font-semibold text-foreground">No records yet</p>
-          <p className="text-sm">Log some weights in a workout to see your personal bests here.</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {records.map(record => (
-        <PersonalRecordCard key={record.exercise.id} record={record} history={historyByExercise.get(record.exercise.id) ?? []} />
-      ))}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-1 self-start rounded-lg border bg-muted/30 p-1">
+        <button
+          onClick={() => setMode("weight")}
+          className={cn(
+            "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+            mode === "weight" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Best Weight
+        </button>
+        <button
+          onClick={() => setMode("volume")}
+          className={cn(
+            "px-3 py-1 rounded-md text-xs font-medium transition-colors",
+            mode === "volume" ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          Best Volume
+        </button>
+      </div>
+
+      <ExerciseProgressPanel exercises={exercises} historyByExercise={historyByExercise} mode={mode} />
+
+      {records.length === 0 ? (
+        <div className="border border-dashed rounded-2xl py-24 flex flex-col items-center gap-4 text-muted-foreground">
+          <Trophy className="h-12 w-12 opacity-20" />
+          <div className="text-center">
+            <p className="font-semibold text-foreground">No records yet</p>
+            <p className="text-sm">
+              {mode === "weight"
+                ? "Log some weights in a workout to see your personal bests here."
+                : "Log reps and weight together in a workout to see your best volume sets here."}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {records.map(record => (
+            <PersonalRecordCard
+              key={record.exercise.id}
+              record={record}
+              history={historyByExercise.get(record.exercise.id) ?? []}
+              mode={mode}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1365,6 +1782,7 @@ export default function GymTrack() {
             <TabsTrigger value="log">Log Workout</TabsTrigger>
             <TabsTrigger value="exercises">Exercises</TabsTrigger>
             <TabsTrigger value="records">Personal Records</TabsTrigger>
+            <TabsTrigger value="weight">Weight Tracker</TabsTrigger>
           </TabsList>
           <TabsContent value="log">
             <LogWorkoutTab />
@@ -1374,6 +1792,9 @@ export default function GymTrack() {
           </TabsContent>
           <TabsContent value="records">
             <PersonalRecordsTab />
+          </TabsContent>
+          <TabsContent value="weight">
+            <WeightTrackerTab />
           </TabsContent>
         </Tabs>
       </div>

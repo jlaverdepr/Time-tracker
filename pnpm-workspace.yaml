@@ -40,6 +40,14 @@ packages:
   - desktop
   - tester-app
 
+# Expo's CLI resolves some packages (e.g. metro-runtime) via plain Node
+# module resolution instead of its own package.json dependencies, which
+# assumes classic hoisting. pnpm's strict linking doesn't hoist by default,
+# so without this the Expo dev server fails to start with "Cannot find
+# module 'metro-runtime/package.json'".
+publicHoistPattern:
+  - '*metro*'
+
 catalog:
   '@replit/vite-plugin-cartographer': ^0.5.21
   '@replit/vite-plugin-dev-banner': ^0.1.1

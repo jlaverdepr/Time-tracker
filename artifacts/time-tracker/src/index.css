@@ -143,3 +143,8 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+@keyframes confetti-burst {
+  0% { transform: translate(-50%, -50%) translate(0, 0) rotate(0deg); opacity: 1; }
+  100% { transform: translate(-50%, -50%) translate(var(--confetti-tx), var(--confetti-ty)) rotate(var(--confetti-rot)); opacity: 0; }
+}

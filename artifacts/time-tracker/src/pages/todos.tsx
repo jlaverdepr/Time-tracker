@@ -14,7 +14,8 @@ import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { Plus, Trash2, CheckCircle2, Circle, ListChecks, Pencil, Check, X, Bell, BellOff, Eraser, GripVertical } from "lucide-react"
+import { Plus, Trash2, CheckCircle2, Circle, ListChecks, Pencil, Check, X, Bell, BellOff, Eraser, GripVertical, PartyPopper } from "lucide-react"
+import { ConfettiBurst } from "@/components/confetti-burst"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -73,6 +74,7 @@ function ProgressRing({ pct, color, size = 28 }: { pct: number; color: string; s
 
 function TaskItem({
   task,
+  listId,
   resetDaily,
   projects,
   subprojectsByProject,
@@ -80,8 +82,14 @@ function TaskItem({
   onUncomplete,
   onDelete,
   onUpdate,
+  draggable,
+  onDragStart,
+  onDragOverRow,
+  onDropRow,
+  onDragEndTask,
 }: {
   task: TodoTask
+  listId: number
   resetDaily: boolean
   projects: Project[]
   subprojectsByProject: Map<number, Subproject[]>
@@ -89,6 +97,11 @@ function TaskItem({
   onUncomplete: (id: number) => void
   onDelete: (id: number) => void
   onUpdate: (id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null; reminderTime?: string | null }) => void
+  draggable?: boolean
+  onDragStart?: (taskId: number, listId: number) => void
+  onDragOverRow?: (taskId: number, insertAfter: boolean) => void
+  onDropRow?: () => void
+  onDragEndTask?: () => void
 }) {
   const done = isTaskComplete(task, resetDaily)
   const [editing, setEditing] = React.useState(false)
@@ -96,6 +109,7 @@ function TaskItem({
   const [editingReminder, setEditingReminder] = React.useState(false)
   const [reminderValue, setReminderValue] = React.useState(task.reminderTime ?? "")
   const editRef = React.useRef<HTMLInputElement>(null)
+  const rowRef = React.useRef<HTMLDivElement>(null)
 
   React.useEffect(() => {
     if (editing) editRef.current?.focus()
@@ -127,14 +141,49 @@ function TaskItem({
   const subsForProject = task.projectId != null ? (subprojectsByProject.get(task.projectId) ?? []) : []
 
   return (
-    <div className={cn(
-      "flex flex-col gap-1 px-3 py-2.5 rounded-xl group transition-all border",
-      done
-        ? "bg-muted/20 border-transparent opacity-60"
-        : "bg-card border-border/60 hover:border-border shadow-sm hover:shadow"
-    )}>
+    <div
+      ref={rowRef}
+      onDragOver={draggable ? (e) => {
+        e.preventDefault()
+        e.stopPropagation()
+        const rect = e.currentTarget.getBoundingClientRect()
+        const insertAfter = e.clientY > rect.top + rect.height / 2
+        onDragOverRow?.(task.id, insertAfter)
+      } : undefined}
+      onDrop={draggable ? (e) => { e.preventDefault(); e.stopPropagation(); onDropRow?.() } : undefined}
+      className={cn(
+        "flex flex-col gap-1 px-3 py-2.5 rounded-xl group transition-all border",
+        done
+          ? "bg-muted/20 border-transparent opacity-60"
+          : "bg-card border-border/60 hover:border-border shadow-sm hover:shadow",
+      )}
+    >
       {/* main row */}
       <div className="flex items-center gap-2.5">
+        {draggable && (
+          <span
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = "move"
+              const rowEl = rowRef.current
+              if (rowEl) {
+                const rect = rowEl.getBoundingClientRect()
+                // Use the whole row (not just this handle) as the native drag
+                // image, so the ghost that follows the cursor looks like the
+                // full task item being picked up — snapshotted synchronously
+                // here, before onDragStart below swaps the origin slot for a
+                // placeholder.
+                e.dataTransfer.setDragImage(rowEl, e.clientX - rect.left, e.clientY - rect.top)
+              }
+              onDragStart?.(task.id, listId)
+            }}
+            onDragEnd={onDragEndTask}
+            title="Drag to reorder or move to another list"
+            className="shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover:opacity-100 transition-opacity -ml-1"
+          >
+            <GripVertical className="h-3.5 w-3.5 text-muted-foreground/40" />
+          </span>
+        )}
         <button
           onClick={() => done ? onUncomplete(task.id) : onComplete(task.id)}
           className="shrink-0 transition-transform hover:scale-110"
@@ -337,6 +386,7 @@ function ListCard({
   tasks,
   projects,
   subprojectsByProject,
+  suggestions,
   onAddTask,
   onComplete,
   onUncomplete,
@@ -351,11 +401,20 @@ function ListCard({
   onDragOverCard,
   onDropCard,
   onDragEndCard,
+  draggedTaskId,
+  draggedTaskData,
+  previewListId,
+  previewOrderIds,
+  onTaskDragStart,
+  onTaskDragOverRow,
+  onTaskDrop,
+  onTaskDragEnd,
 }: {
   list: TodoList
   tasks: TodoTask[]
   projects: Project[]
   subprojectsByProject: Map<number, Subproject[]>
+  suggestions: string[]
   onAddTask: (listId: number, text: string) => void
   onComplete: (id: number) => void
   onUncomplete: (id: number) => void
@@ -370,21 +429,90 @@ function ListCard({
   onDragOverCard: (e: React.DragEvent) => void
   onDropCard: () => void
   onDragEndCard: () => void
+  draggedTaskId: number | null
+  draggedTaskData: TodoTask | null
+  previewListId: number | null
+  previewOrderIds: number[] | null
+  onTaskDragStart: (taskId: number, listId: number) => void
+  onTaskDragOverRow: (taskId: number | null, insertAfter: boolean) => void
+  onTaskDrop: () => void
+  onTaskDragEnd: () => void
 }) {
   const [newText, setNewText] = React.useState("")
+  const [showSuggestions, setShowSuggestions] = React.useState(false)
+  const [highlightIndex, setHighlightIndex] = React.useState(-1)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const contentRef = React.useRef<HTMLDivElement>(null)
   const { manualHeight, handleMouseDown } = useResizableHeight(`todo-list-height-${list.id}`)
   const pct = completionRate(tasks, list.resetDaily)
   const doneTasks = tasks.filter(t => isTaskComplete(t, list.resetDaily))
   const activeTasks = tasks.filter(t => !isTaskComplete(t, list.resetDaily))
+  const complete = tasks.length > 0 && pct === 100
+
+  // Live drag preview: while this list is the current drop target, render
+  // tasks in the hovered order (with the dragged task's slot as a gap) —
+  // like rearranging iOS home screen icons. If the dragged task started
+  // here but the pointer has moved to a different list, drop it from view
+  // entirely so it doesn't appear to be in two places at once.
+  const isPreviewTarget = previewListId === list.id
+  const draggedFromHere = draggedTaskId != null && draggedTaskData?.listId === list.id
+  const displayActiveTasks = React.useMemo(() => {
+    if (isPreviewTarget && previewOrderIds) {
+      const byId = new Map(activeTasks.map(t => [t.id, t]))
+      if (draggedTaskData && !byId.has(draggedTaskData.id)) byId.set(draggedTaskData.id, draggedTaskData)
+      return previewOrderIds.map(id => byId.get(id)).filter((t): t is TodoTask => !!t)
+    }
+    if (draggedFromHere) {
+      return activeTasks.filter(t => t.id !== draggedTaskId)
+    }
+    return activeTasks
+  }, [isPreviewTarget, previewOrderIds, activeTasks, draggedTaskData, draggedFromHere, draggedTaskId])
+
+  const [celebrate, setCelebrate] = React.useState(false)
+  const prevCompleteRef = React.useRef(complete)
+  React.useEffect(() => {
+    if (complete && !prevCompleteRef.current) setCelebrate(true)
+    prevCompleteRef.current = complete
+  }, [complete])
+
+  const filteredSuggestions = React.useMemo(() => {
+    const q = newText.trim().toLowerCase()
+    if (!q) return []
+    return suggestions
+      .filter(s => s.toLowerCase() !== q && s.toLowerCase().includes(q))
+      .slice(0, 6)
+  }, [newText, suggestions])
+
+  function submitText(text: string) {
+    if (!text.trim()) return
+    onAddTask(list.id, text.trim())
+    setNewText("")
+    setShowSuggestions(false)
+    setHighlightIndex(-1)
+    inputRef.current?.focus()
+  }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!newText.trim()) return
-    onAddTask(list.id, newText.trim())
-    setNewText("")
-    inputRef.current?.focus()
+    if (highlightIndex >= 0 && filteredSuggestions[highlightIndex]) {
+      submitText(filteredSuggestions[highlightIndex])
+    } else {
+      submitText(newText)
+    }
+  }
+
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showSuggestions || filteredSuggestions.length === 0) return
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      setHighlightIndex(i => (i + 1) % filteredSuggestions.length)
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      setHighlightIndex(i => (i <= 0 ? filteredSuggestions.length - 1 : i - 1))
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false)
+      setHighlightIndex(-1)
+    }
   }
 
   return (
@@ -400,13 +528,21 @@ function ListCard({
         onDragOver={onDragOverCard}
         onDrop={onDropCard}
         onDragEnd={onDragEndCard}
-        className="px-4 py-3 border-b flex items-center gap-2.5 group/hdr cursor-grab active:cursor-grabbing"
+        className={cn(
+          "relative px-4 py-3 border-b flex items-center gap-2.5 group/hdr cursor-grab active:cursor-grabbing transition-colors",
+          complete && "bg-amber-400/10",
+        )}
         style={{ borderLeftColor: list.color, borderLeftWidth: 4 }}
       >
+        {celebrate && <ConfettiBurst onDone={() => setCelebrate(false)} />}
         <GripVertical className="h-3.5 w-3.5 text-muted-foreground/30 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0 -ml-1" />
-        <div className="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-xs shrink-0"
-          style={{ backgroundColor: list.color }}>
-          {list.letter}
+        <div className={cn(
+          "relative w-7 h-7 rounded-lg flex items-center justify-center font-bold text-white text-xs shrink-0 transition-all",
+          complete && "ring-2 ring-amber-400 ring-offset-1 ring-offset-card",
+        )} style={{ backgroundColor: list.color }}>
+          {complete
+            ? <PartyPopper className="h-3.5 w-3.5" />
+            : list.letter}
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm truncate leading-tight">{list.name}</div>
@@ -416,8 +552,8 @@ function ListCard({
             {list.autoClearCompleted && " · auto-clear"}
           </div>
         </div>
-        <ProgressRing pct={pct} color={list.color} size={28} />
-        <span className="font-mono text-xs font-bold w-8 text-right shrink-0" style={{ color: list.color }}>{pct}%</span>
+        <ProgressRing pct={pct} color={complete ? "#f59e0b" : list.color} size={28} />
+        <span className="font-mono text-xs font-bold w-8 text-right shrink-0" style={{ color: complete ? "#f59e0b" : list.color }}>{pct}%</span>
         <div className="flex items-center gap-0.5 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0">
           <button onClick={() => onEditList(list)}
             className="p-1 rounded hover:bg-muted transition-colors" title="Edit list">
@@ -431,27 +567,54 @@ function ListCard({
       </div>
 
       {/* add task */}
-      <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-2 border-b bg-muted/20">
-        <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <input
-          ref={inputRef}
-          value={newText}
-          onChange={e => setNewText(e.target.value)}
-          placeholder="Add a task…"
-          className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/40 min-w-0"
-        />
-        {newText.trim() && (
-          <button type="submit"
-            className="text-xs font-bold px-2 py-0.5 rounded-md text-white shrink-0"
-            style={{ backgroundColor: list.color }}>
-            Add
-          </button>
+      <div className="relative border-b bg-muted/20">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 px-4 py-2">
+          <Plus className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <input
+            ref={inputRef}
+            value={newText}
+            onChange={e => { setNewText(e.target.value); setShowSuggestions(true); setHighlightIndex(-1) }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 100)}
+            onKeyDown={handleInputKeyDown}
+            placeholder="Add a task…"
+            autoComplete="off"
+            className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/40 min-w-0"
+          />
+          {newText.trim() && (
+            <button type="submit"
+              className="text-xs font-bold px-2 py-0.5 rounded-md text-white shrink-0"
+              style={{ backgroundColor: list.color }}>
+              Add
+            </button>
+          )}
+        </form>
+
+        {showSuggestions && filteredSuggestions.length > 0 && (
+          <div className="absolute left-0 right-0 top-full z-30 mx-2 mb-1 rounded-lg border bg-popover shadow-lg overflow-hidden">
+            {filteredSuggestions.map((s, idx) => (
+              <button
+                key={s}
+                type="button"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => submitText(s)}
+                className={cn(
+                  "w-full text-left px-3 py-1.5 text-sm truncate transition-colors",
+                  idx === highlightIndex ? "bg-accent text-accent-foreground" : "hover:bg-muted",
+                )}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         )}
-      </form>
+      </div>
 
       {/* task list — auto-fits to content until manually resized */}
       <div
         ref={contentRef}
+        onDragOver={e => { e.preventDefault(); onTaskDragOverRow(null, true) }}
+        onDrop={e => { e.preventDefault(); onTaskDrop() }}
         className={cn("p-3 space-y-1.5", manualHeight != null && "overflow-y-auto")}
         style={manualHeight != null ? { height: manualHeight } : undefined}
       >
@@ -462,11 +625,23 @@ function ListCard({
           </div>
         ) : (
           <>
-            {activeTasks.map(task => (
-              <TaskItem key={task.id} task={task} resetDaily={list.resetDaily}
-                projects={projects} subprojectsByProject={subprojectsByProject}
-                onComplete={onComplete} onUncomplete={onUncomplete}
-                onDelete={onDelete} onUpdate={onUpdate} />
+            {displayActiveTasks.map(task => (
+              task.id === draggedTaskId ? (
+                <div key={task.id} className="rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 px-3 py-2.5">
+                  <div className="h-4" />
+                </div>
+              ) : (
+                <TaskItem key={task.id} task={task} listId={list.id} resetDaily={list.resetDaily}
+                  projects={projects} subprojectsByProject={subprojectsByProject}
+                  onComplete={onComplete} onUncomplete={onUncomplete}
+                  onDelete={onDelete} onUpdate={onUpdate}
+                  draggable
+                  onDragStart={onTaskDragStart}
+                  onDragOverRow={onTaskDragOverRow}
+                  onDropRow={onTaskDrop}
+                  onDragEndTask={onTaskDragEnd}
+                />
+              )
             ))}
             {doneTasks.length > 0 && (
               <>
@@ -483,7 +658,7 @@ function ListCard({
                   <div className="flex-1 h-px bg-border" />
                 </div>
                 {doneTasks.map(task => (
-                  <TaskItem key={task.id} task={task} resetDaily={list.resetDaily}
+                  <TaskItem key={task.id} task={task} listId={list.id} resetDaily={list.resetDaily}
                     projects={projects} subprojectsByProject={subprojectsByProject}
                     onComplete={onComplete} onUncomplete={onUncomplete}
                     onDelete={onDelete} onUpdate={onUpdate} />
@@ -525,6 +700,9 @@ export default function Todos() {
   const [dragListId, setDragListId] = React.useState<number | null>(null)
   const [dragOverListId, setDragOverListId] = React.useState<number | null>(null)
   const [deleteListId, setDeleteListId] = React.useState<number | null>(null)
+  const [draggedTask, setDraggedTask] = React.useState<{ id: number; listId: number } | null>(null)
+  const [previewListId, setPreviewListId] = React.useState<number | null>(null)
+  const [previewOrderIds, setPreviewOrderIds] = React.useState<number[] | null>(null)
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: getListTodoListsQueryKey() })
@@ -538,6 +716,28 @@ export default function Todos() {
       map.get(t.listId)!.push(t)
     }
     return map
+  }, [allTasks])
+
+  const listsById = React.useMemo(() => new Map(lists.map(l => [l.id, l])), [lists])
+
+  // Most-recently-used distinct task text, across all lists, for the
+  // "add a task" autocomplete dropdown.
+  const taskTextHistory = React.useMemo(() => {
+    const mostRecentTs = new Map<string, number>()
+    const original = new Map<string, string>()
+    for (const t of allTasks) {
+      const trimmed = t.text.trim()
+      const key = trimmed.toLowerCase()
+      if (!key) continue
+      const ts = new Date(t.createdAt).getTime()
+      if (!mostRecentTs.has(key) || ts > mostRecentTs.get(key)!) {
+        mostRecentTs.set(key, ts)
+        original.set(key, trimmed)
+      }
+    }
+    return Array.from(original.entries())
+      .sort((a, b) => mostRecentTs.get(b[0])! - mostRecentTs.get(a[0])!)
+      .map(([, text]) => text)
   }, [allTasks])
 
   const subprojectsByProject = React.useMemo(() => {
@@ -647,6 +847,93 @@ export default function Todos() {
     })
   }
 
+  // ── task drag-and-drop: reorder within a list, or move to another list ──
+  // Live-previews the drop position as the pointer moves (like rearranging
+  // iOS home screen icons) rather than only reacting on drop, so the user
+  // can see exactly where an item will land while still dragging it.
+  function activeTasksFor(listId: number): TodoTask[] {
+    const list = listsById.get(listId)
+    if (!list) return []
+    return (tasksByList.get(listId) ?? []).filter(t => !isTaskComplete(t, list.resetDaily))
+  }
+
+  function handleTaskDragStart(taskId: number, listId: number) {
+    setDraggedTask({ id: taskId, listId })
+    setPreviewListId(listId)
+    setPreviewOrderIds(activeTasksFor(listId).map(t => t.id))
+  }
+
+  function handleTaskDragOverRow(listId: number, overTaskId: number | null, insertAfter: boolean) {
+    const dragged = draggedTask
+    if (!dragged) return
+
+    const baseline = (previewListId === listId && previewOrderIds)
+      ? previewOrderIds.filter(id => id !== dragged.id)
+      : activeTasksFor(listId).map(t => t.id).filter(id => id !== dragged.id)
+
+    let insertAt = baseline.length
+    if (overTaskId != null) {
+      const idx = baseline.indexOf(overTaskId)
+      insertAt = idx === -1 ? baseline.length : (insertAfter ? idx + 1 : idx)
+    }
+    const next = [...baseline]
+    next.splice(insertAt, 0, dragged.id)
+
+    setPreviewListId(listId)
+    setPreviewOrderIds(next)
+  }
+
+  function commitTaskDrop() {
+    const dragged = draggedTask
+    const targetListId = previewListId
+    const order = previewOrderIds
+    if (!dragged || targetListId == null || !order) return
+
+    const listChanged = dragged.listId !== targetListId
+    if (listChanged) {
+      const sourceArr = activeTasksFor(dragged.listId).filter(t => t.id !== dragged.id)
+      sourceArr.forEach((t, idx) => {
+        if (t.sortOrder !== idx) {
+          updateTask.mutate({ id: t.id, data: { sortOrder: idx } }, { onSuccess: () => invalidate() })
+        }
+      })
+    }
+
+    const draggedTaskObj = tasksByList.get(dragged.listId)?.find(t => t.id === dragged.id)
+    order.forEach((id, idx) => {
+      if (id === dragged.id) {
+        if (listChanged || draggedTaskObj?.sortOrder !== idx) {
+          updateTask.mutate(
+            { id, data: listChanged ? { listId: targetListId, sortOrder: idx } : { sortOrder: idx } },
+            { onSuccess: () => invalidate() },
+          )
+        }
+      } else {
+        const t = (tasksByList.get(targetListId) ?? []).find(x => x.id === id)
+        if (t && t.sortOrder !== idx) {
+          updateTask.mutate({ id, data: { sortOrder: idx } }, { onSuccess: () => invalidate() })
+        }
+      }
+    })
+  }
+
+  function handleTaskDrop() {
+    commitTaskDrop()
+    setDraggedTask(null)
+    setPreviewListId(null)
+    setPreviewOrderIds(null)
+  }
+
+  function handleTaskDragEnd() {
+    setDraggedTask(null)
+    setPreviewListId(null)
+    setPreviewOrderIds(null)
+  }
+
+  const draggedTaskData = draggedTask
+    ? (tasksByList.get(draggedTask.listId)?.find(t => t.id === draggedTask.id) ?? null)
+    : null
+
   return (
     <Layout>
       <div className="flex flex-col gap-6 p-6 md:p-8 w-full max-w-[1600px] mx-auto">
@@ -683,6 +970,7 @@ export default function Todos() {
                 tasks={tasksByList.get(list.id) ?? []}
                 projects={projects}
                 subprojectsByProject={subprojectsByProject}
+                suggestions={taskTextHistory}
                 onAddTask={handleAddTask}
                 onComplete={handleComplete}
                 onUncomplete={handleUncomplete}
@@ -697,6 +985,14 @@ export default function Todos() {
                 onDragOverCard={e => handleDragOverList(e, list.id)}
                 onDropCard={() => handleDropOnList(list.id)}
                 onDragEndCard={() => { setDragListId(null); setDragOverListId(null) }}
+                draggedTaskId={draggedTask?.id ?? null}
+                draggedTaskData={draggedTaskData}
+                previewListId={previewListId}
+                previewOrderIds={previewOrderIds}
+                onTaskDragStart={handleTaskDragStart}
+                onTaskDragOverRow={(taskId, insertAfter) => handleTaskDragOverRow(list.id, taskId, insertAfter)}
+                onTaskDrop={handleTaskDrop}
+                onTaskDragEnd={handleTaskDragEnd}
               />
             ))}
           </div>

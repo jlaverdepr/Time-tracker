@@ -2,7 +2,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import {
   gymExercisesTable, gymWorkoutsTable, gymWorkoutEntriesTable, gymWorkoutSetsTable,
-  gymRunsTable, gymWorkoutTemplatesTable, gymWorkoutTemplateExercisesTable,
+  gymRunsTable, gymBodyWeightLogsTable, gymWorkoutTemplatesTable, gymWorkoutTemplateExercisesTable,
 } from "@workspace/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { format } from "date-fns";
@@ -13,16 +13,18 @@ import {
   ListGymWorkoutSetsQueryParams, CreateGymWorkoutSetBody,
   UpdateGymWorkoutSetParams, UpdateGymWorkoutSetBody, DeleteGymWorkoutSetParams,
   CreateGymRunBody, UpdateGymRunParams, UpdateGymRunBody, DeleteGymRunParams,
+  CreateGymBodyWeightLogBody, UpdateGymBodyWeightLogParams, UpdateGymBodyWeightLogBody, DeleteGymBodyWeightLogParams,
   CreateGymWorkoutTemplateBody, DeleteGymWorkoutTemplateParams,
   ListGymExercisesResponse, CreateGymExerciseResponse, UpdateGymExerciseResponse,
   ListGymWorkoutsResponse, CreateGymWorkoutResponse, UpdateGymWorkoutResponse,
   ListGymWorkoutEntriesResponse, CreateGymWorkoutEntryResponse,
   ListGymWorkoutSetsResponse, CreateGymWorkoutSetResponse, UpdateGymWorkoutSetResponse,
   ListGymRunsResponse, CreateGymRunResponse, UpdateGymRunResponse,
+  ListGymBodyWeightLogsResponse, CreateGymBodyWeightLogResponse, UpdateGymBodyWeightLogResponse,
   ListGymWorkoutTemplatesResponse, CreateGymWorkoutTemplateResponse,
 } from "@workspace/api-zod";
 import type {
-  GymExercise, GymWorkout, GymWorkoutEntry, GymWorkoutSet, GymRun, GymWorkoutTemplate,
+  GymExercise, GymWorkout, GymWorkoutEntry, GymWorkoutSet, GymRun, GymBodyWeightLog, GymWorkoutTemplate,
 } from "@workspace/db/schema";
 
 const router = Router();
@@ -76,6 +78,15 @@ function serializeRun(row: GymRun) {
     date: row.date,
     distanceKm: row.distanceKm ?? null,
     durationMinutes: row.durationMinutes ?? null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+function serializeBodyWeightLog(row: GymBodyWeightLog) {
+  return {
+    id: row.id,
+    date: row.date,
+    weightKg: row.weightKg,
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -299,6 +310,46 @@ router.delete("/gym-runs/:id", async (req, res): Promise<void> => {
   const parsed = DeleteGymRunParams.safeParse(req.params);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   await db.delete(gymRunsTable).where(eq(gymRunsTable.id, parsed.data.id));
+  res.status(204).send();
+});
+
+// ─── body weight logs ────────────────────────────────────────────────────────────
+
+router.get("/gym-body-weight-logs", async (_req, res): Promise<void> => {
+  const rows = await db.select().from(gymBodyWeightLogsTable).orderBy(gymBodyWeightLogsTable.date, gymBodyWeightLogsTable.createdAt);
+  res.json(ListGymBodyWeightLogsResponse.parse(rows.map(serializeBodyWeightLog)));
+});
+
+router.post("/gym-body-weight-logs", async (req, res): Promise<void> => {
+  const parsed = CreateGymBodyWeightLogBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const [row] = await db.insert(gymBodyWeightLogsTable).values({
+    date: parsed.data.date,
+    weightKg: parsed.data.weightKg,
+  }).returning();
+  res.status(201).json(CreateGymBodyWeightLogResponse.parse(serializeBodyWeightLog(row)));
+});
+
+router.patch("/gym-body-weight-logs/:id", async (req, res): Promise<void> => {
+  const params = UpdateGymBodyWeightLogParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = UpdateGymBodyWeightLogBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+
+  const updates: Partial<typeof gymBodyWeightLogsTable.$inferInsert> = {};
+  if (parsed.data.date !== undefined) updates.date = parsed.data.date;
+  if (parsed.data.weightKg !== undefined) updates.weightKg = parsed.data.weightKg;
+
+  if (Object.keys(updates).length === 0) { res.status(400).json({ error: "Nothing to update" }); return; }
+  const [row] = await db.update(gymBodyWeightLogsTable).set(updates).where(eq(gymBodyWeightLogsTable.id, params.data.id)).returning();
+  if (!row) { res.status(404).json({ error: "Body weight log not found" }); return; }
+  res.json(UpdateGymBodyWeightLogResponse.parse(serializeBodyWeightLog(row)));
+});
+
+router.delete("/gym-body-weight-logs/:id", async (req, res): Promise<void> => {
+  const parsed = DeleteGymBodyWeightLogParams.safeParse(req.params);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  await db.delete(gymBodyWeightLogsTable).where(eq(gymBodyWeightLogsTable.id, parsed.data.id));
   res.status(204).send();
 });
 

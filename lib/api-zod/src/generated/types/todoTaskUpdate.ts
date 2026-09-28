@@ -17,4 +17,7 @@ export interface TodoTaskUpdate {
   scheduledDate?: string | null;
   /** @nullable */
   reminderTime?: string | null;
+  /** Move the task to a different list */
+  listId?: number;
+  sortOrder?: number;
 }

@@ -60,6 +60,15 @@ export const gymRunsTable = sqliteTable("gym_runs", {
     .default(sql`(unixepoch())`),
 });
 
+export const gymBodyWeightLogsTable = sqliteTable("gym_body_weight_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull(),
+  weightKg: real("weight_kg").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+});
+
 export const gymWorkoutTemplatesTable = sqliteTable("gym_workout_templates", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull(),
@@ -84,6 +93,7 @@ export const insertGymWorkoutSchema = createInsertSchema(gymWorkoutsTable).omit(
 export const insertGymWorkoutEntrySchema = createInsertSchema(gymWorkoutEntriesTable).omit({ id: true, createdAt: true });
 export const insertGymWorkoutSetSchema = createInsertSchema(gymWorkoutSetsTable).omit({ id: true, createdAt: true });
 export const insertGymRunSchema = createInsertSchema(gymRunsTable).omit({ id: true, createdAt: true });
+export const insertGymBodyWeightLogSchema = createInsertSchema(gymBodyWeightLogsTable).omit({ id: true, createdAt: true });
 export const insertGymWorkoutTemplateSchema = createInsertSchema(gymWorkoutTemplatesTable).omit({ id: true, createdAt: true });
 export const insertGymWorkoutTemplateExerciseSchema = createInsertSchema(gymWorkoutTemplateExercisesTable).omit({ id: true });
 
@@ -92,6 +102,7 @@ export type GymWorkout = typeof gymWorkoutsTable.$inferSelect;
 export type GymWorkoutEntry = typeof gymWorkoutEntriesTable.$inferSelect;
 export type GymWorkoutSet = typeof gymWorkoutSetsTable.$inferSelect;
 export type GymRun = typeof gymRunsTable.$inferSelect;
+export type GymBodyWeightLog = typeof gymBodyWeightLogsTable.$inferSelect;
 export type GymWorkoutTemplate = typeof gymWorkoutTemplatesTable.$inferSelect;
 export type GymWorkoutTemplateExercise = typeof gymWorkoutTemplateExercisesTable.$inferSelect;
 export type InsertGymExercise = z.infer<typeof insertGymExerciseSchema>;
@@ -99,5 +110,6 @@ export type InsertGymWorkout = z.infer<typeof insertGymWorkoutSchema>;
 export type InsertGymWorkoutEntry = z.infer<typeof insertGymWorkoutEntrySchema>;
 export type InsertGymWorkoutSet = z.infer<typeof insertGymWorkoutSetSchema>;
 export type InsertGymRun = z.infer<typeof insertGymRunSchema>;
+export type InsertGymBodyWeightLog = z.infer<typeof insertGymBodyWeightLogSchema>;
 export type InsertGymWorkoutTemplate = z.infer<typeof insertGymWorkoutTemplateSchema>;
 export type InsertGymWorkoutTemplateExercise = z.infer<typeof insertGymWorkoutTemplateExerciseSchema>;

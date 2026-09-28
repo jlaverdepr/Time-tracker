@@ -1,101 +1,140 @@
-import { app, BrowserWindow, dialog } from "electron";
-import { createServer } from "node:net";
+import { app, BrowserWindow, Menu, ipcMain } from "electron";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
 import path from "node:path";
-import express from "express";
-
-// The bundled api-server logger uses pino's "pino-pretty" transport in
-// non-production mode, which requires resolving a real file from a worker
-// thread — that file doesn't exist once everything is bundled into one file.
-process.env.NODE_ENV = "production";
 
 const APP_NAME =
   process.env.APP_CHANNEL === "beta" ? "FocusTime Beta" : "FocusTime";
 
 app.setName(APP_NAME);
 
-function getFreePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (address && typeof address === "object") {
-        const { port } = address;
-        server.close(() => resolve(port));
-      } else {
-        reject(new Error("Could not determine a free port"));
-      }
-    });
-  });
+// The app no longer hosts its own server/database — it's a thin client of
+// the same always-on cloud server the phone app talks to, so a workout
+// logged on either device shows up on both. See DEPLOY.md for the server
+// side of this.
+type RemoteConfig = { url: string; token: string };
+
+function configPath(): string {
+  return path.join(app.getPath("userData"), "remote-config.json");
 }
 
-const repoRoot = path.join(__dirname, "..", "..");
-
-function migrationsFolderPath(): string {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, "drizzle")
-    : path.join(repoRoot, "lib/db/drizzle");
-}
-
-function staticDirPath(): string {
-  return app.isPackaged
-    ? path.join(process.resourcesPath, "public")
-    : path.join(repoRoot, "artifacts/time-tracker/dist/public");
-}
-
-async function startServer(): Promise<number> {
-  process.env.DB_PATH = path.join(
-    app.getPath("userData"),
-    "time-tracker.sqlite",
-  );
-
-  const migrationsFolder = migrationsFolderPath();
-  const staticDir = staticDirPath();
-
-  const { db } = await import("@workspace/db");
-  const { migrate } = await import("drizzle-orm/better-sqlite3/migrator");
-  migrate(db, { migrationsFolder });
-
-  const apiApp = (await import("@workspace/api-server")).default;
-
-  const server = express();
-  // apiApp (@workspace/api-server's app.ts) already mounts its router at
-  // "/api" internally, so it's mounted at "/" here, not "/api".
-  server.use(apiApp);
-  server.use(express.static(staticDir));
-  server.get("/{*splat}", (_req, res) => {
-    res.sendFile(path.join(staticDir, "index.html"));
-  });
-
-  const port = await getFreePort();
-  await new Promise<void>((resolve) => {
-    server.listen(port, "127.0.0.1", () => resolve());
-  });
-
-  return port;
-}
-
-async function createWindow(): Promise<void> {
-  let port: number;
+function loadConfig(): RemoteConfig | null {
+  const p = configPath();
+  if (!existsSync(p)) return null;
   try {
-    port = await startServer();
-  } catch (err) {
-    dialog.showErrorBox(
-      `${APP_NAME} failed to start`,
-      `Could not set up the local database:\n\n${(err as Error).message}`,
-    );
-    app.quit();
-    return;
+    const parsed = JSON.parse(readFileSync(p, "utf-8"));
+    if (
+      typeof parsed?.url === "string" && parsed.url &&
+      typeof parsed?.token === "string" && parsed.token
+    ) {
+      return { url: parsed.url, token: parsed.token };
+    }
+  } catch {
+    // Malformed config file — treat as unconfigured.
   }
+  return null;
+}
 
+function saveConfig(config: RemoteConfig): void {
+  writeFileSync(configPath(), JSON.stringify(config, null, 2), "utf-8");
+}
+
+function clearConfig(): void {
+  const p = configPath();
+  if (existsSync(p)) unlinkSync(p);
+}
+
+// `dist-main/**/*` (this file's own build output, including setup.html and
+// setup-preload.js — see build/build-main.mjs) is packed into app.asar the
+// same way whether or not the app is packaged, and Node/Electron resolve
+// paths inside an asar transparently, so a plain __dirname-relative path
+// works in both dev and packaged builds.
+function resourcePath(...segments: string[]): string {
+  return path.join(__dirname, ...segments);
+}
+
+async function checkServerReachable(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${url}/api/healthz`, {
+      signal: AbortSignal.timeout(5000),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+let mainWindow: BrowserWindow | null = null;
+
+function loadRemote(win: BrowserWindow, config: RemoteConfig): void {
+  const target = new URL(config.url);
+  target.searchParams.set("token", config.token);
+  win.loadURL(target.toString());
+}
+
+function showSetup(win: BrowserWindow): void {
+  win.loadFile(resourcePath("setup.html"));
+}
+
+function buildMenu(): void {
+  const template: Electron.MenuItemConstructorOptions[] = [
+    {
+      label: APP_NAME,
+      submenu: [
+        {
+          label: "Server Settings…",
+          click: () => {
+            clearConfig();
+            if (mainWindow) showSetup(mainWindow);
+          },
+        },
+        { type: "separator" },
+        { role: "quit" },
+      ],
+    },
+    { role: "editMenu" },
+    { role: "viewMenu" },
+    { role: "windowMenu" },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function createWindow(): void {
   const win = new BrowserWindow({
     width: 1280,
     height: 860,
     title: APP_NAME,
+    webPreferences: {
+      preload: resourcePath("setup-preload.js"),
+    },
   });
-  win.loadURL(`http://127.0.0.1:${port}/`);
+  mainWindow = win;
+
+  const config = loadConfig();
+  if (config) {
+    loadRemote(win, config);
+  } else {
+    showSetup(win);
+  }
 }
+
+ipcMain.handle(
+  "save-remote-config",
+  async (_event, { url, token }: RemoteConfig) => {
+    const trimmedUrl = url.trim().replace(/\/+$/, "");
+    const trimmedToken = token.trim();
+    if (!trimmedUrl || !trimmedToken) return false;
+
+    const reachable = await checkServerReachable(trimmedUrl);
+    if (!reachable) return false;
+
+    const config = { url: trimmedUrl, token: trimmedToken };
+    saveConfig(config);
+    if (mainWindow) loadRemote(mainWindow, config);
+    return true;
+  },
+);
+
+buildMenu();
 
 app.whenReady().then(() => {
   createWindow();

@@ -17,14 +17,16 @@ import {
 } from "date-fns"
 import {
   CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, CheckCircle2,
-  Dumbbell, Footprints, CalendarPlus, Plus, Circle, Trash2,
+  Dumbbell, Footprints, CalendarPlus, Plus, Circle, Trash2, Pencil,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { categoryColor, formatPace, formatSpeed } from "@/lib/gym-utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { EditSessionDialog } from "@/components/edit-session-dialog"
+import { ConfettiBurst } from "@/components/confetti-burst"
+import type { Session } from "@workspace/api-client-react"
 
 type CalendarIconKey = "subprojectActive" | "subprojectCompleted" | "todoBadges" | "workout" | "run" | "prepared"
 
@@ -81,26 +83,37 @@ function getToday() { return format(new Date(), "yyyy-MM-dd") }
 
 // ── expandable to-do list panel ─────────────────────────────────────────────────
 
-function TodoDayPanel({ item, date, isToday: dayIsToday }: {
-  item: TodoCalendarSummaryItem
+function TodoDayPanel({ list, stats, date, isToday: dayIsToday }: {
+  list: { id: number; name: string; color: string; letter: string }
+  stats: { totalTasks: number; completedTasks: number; percentage: number }
   date: string
   isToday: boolean
 }) {
   const [expanded, setExpanded] = React.useState(false)
+  const [newTaskText, setNewTaskText] = React.useState("")
   const queryClient = useQueryClient()
+  const complete = stats.totalTasks > 0 && stats.percentage === 100
+
+  const [celebrate, setCelebrate] = React.useState(false)
+  const prevCompleteRef = React.useRef(complete)
+  React.useEffect(() => {
+    if (complete && !prevCompleteRef.current) setCelebrate(true)
+    prevCompleteRef.current = complete
+  }, [complete])
 
   const { data: dayTasks, isLoading } = useGetTodoDayDetail(
-    { listId: item.listId, date },
-    { query: { enabled: expanded, queryKey: ["todo-day-detail", item.listId, date] } }
+    { listId: list.id, date },
+    { query: { enabled: expanded, queryKey: ["todo-day-detail", list.id, date] } }
   )
 
   const toggleDayTask = useToggleTodoDayDetailTask()
   const completeTask = useCompleteTodoTask()
   const uncompleteTask = useUncompleteTodoTask()
   const deleteTask = useDeleteTodoTask()
+  const createTask = useCreateTodoTask()
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["todo-day-detail", item.listId, date] })
+    queryClient.invalidateQueries({ queryKey: ["todo-day-detail", list.id, date] })
     queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
     queryClient.invalidateQueries({ queryKey: ["todo-calendar"] })
   }
@@ -119,33 +132,48 @@ function TodoDayPanel({ item, date, isToday: dayIsToday }: {
     deleteTask.mutate({ id: taskId }, { onSuccess: invalidate })
   }
 
+  function handleAddTask(e: React.FormEvent) {
+    e.preventDefault()
+    if (!newTaskText.trim()) return
+    createTask.mutate({ data: { listId: list.id, text: newTaskText.trim(), scheduledDate: date } }, {
+      onSuccess: () => { invalidate(); setNewTaskText("") },
+    })
+  }
+
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className={cn("relative rounded-lg border bg-card overflow-hidden", complete && "border-amber-400/60")}>
+      {celebrate && <ConfettiBurst onDone={() => setCelebrate(false)} />}
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-left"
+        className={cn("w-full flex items-center gap-3 p-3 hover:bg-muted/30 transition-colors text-left", complete && "bg-amber-400/10")}
       >
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0"
-          style={{ backgroundColor: item.listColor }}>
-          {item.letter}
+        <div className={cn(
+          "w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0 transition-all",
+          complete && "ring-2 ring-amber-400 ring-offset-1 ring-offset-card",
+        )} style={{ backgroundColor: list.color }}>
+          {list.letter}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium">{item.listName}</p>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all"
-                style={{ width: `${item.percentage}%`, backgroundColor: item.listColor }}
-              />
+          <p className="text-sm font-medium">{list.name}</p>
+          {stats.totalTasks > 0 && (
+            <div className="flex items-center gap-2 mt-1">
+              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${stats.percentage}%`, backgroundColor: list.color }}
+                />
+              </div>
+              <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                {stats.completedTasks}/{stats.totalTasks}
+              </span>
             </div>
-            <span className="text-xs text-muted-foreground tabular-nums shrink-0">
-              {item.completedTasks}/{item.totalTasks}
-            </span>
-          </div>
+          )}
         </div>
-        <span className="font-mono font-bold text-sm shrink-0" style={{ color: item.listColor }}>
-          {item.percentage}%
-        </span>
+        {stats.totalTasks > 0 && (
+          <span className="font-mono font-bold text-sm shrink-0" style={{ color: list.color }}>
+            {stats.percentage}%
+          </span>
+        )}
         <ChevronDown className={cn("h-4 w-4 text-muted-foreground shrink-0 transition-transform", expanded && "rotate-180")} />
       </button>
 
@@ -179,6 +207,16 @@ function TodoDayPanel({ item, date, isToday: dayIsToday }: {
               </div>
             ))
           )}
+
+          <form onSubmit={handleAddTask} className="flex items-center gap-1.5 pt-1">
+            <Plus className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0 ml-2" />
+            <input
+              value={newTaskText}
+              onChange={e => setNewTaskText(e.target.value)}
+              placeholder="Add a task…"
+              className="flex-1 min-w-0 bg-transparent text-sm py-1.5 focus:outline-none placeholder:text-muted-foreground/40"
+            />
+          </form>
         </div>
       )}
     </div>
@@ -240,66 +278,12 @@ function WorkoutDayPanel({ workout, entries, exercisesById, setsByEntry }: {
   )
 }
 
-// ── add a task in advance for a future day ──────────────────────────────────────
-
-function AddFutureTaskForm({ date }: { date: string }) {
-  const queryClient = useQueryClient()
-  const { data: lists = [] } = useListTodoLists()
-  const createTask = useCreateTodoTask()
-  const [listId, setListId] = React.useState<string>("")
-  const [text, setText] = React.useState("")
-
-  React.useEffect(() => {
-    if (!listId && lists.length > 0) setListId(String(lists[0].id))
-  }, [lists, listId])
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!listId || !text.trim()) return
-    createTask.mutate({ data: { listId: Number(listId), text: text.trim(), scheduledDate: date } }, {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
-        queryClient.invalidateQueries({ queryKey: ["todo-calendar"] })
-        setText("")
-      },
-    })
-  }
-
-  if (lists.length === 0) return null
-
-  return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3 rounded-lg border border-dashed bg-muted/20">
-      <CalendarPlus className="h-4 w-4 text-muted-foreground shrink-0" />
-      <Select value={listId} onValueChange={setListId}>
-        <SelectTrigger className="h-8 w-[130px] text-xs shrink-0">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {lists.map(l => (
-            <SelectItem key={l.id} value={String(l.id)}>{l.name}</SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <input
-        value={text}
-        onChange={e => setText(e.target.value)}
-        placeholder="Prepare a task for this day…"
-        className="flex-1 bg-transparent text-sm focus:outline-none placeholder:text-muted-foreground/40 min-w-0"
-      />
-      {text.trim() && (
-        <button type="submit" className="text-xs font-bold px-2 py-1 rounded-md bg-primary text-primary-foreground shrink-0">
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </form>
-  )
-}
-
 // ── main page ─────────────────────────────────────────────────────────────────
 
 export default function Calendar() {
   const [currentMonth, setCurrentMonth] = React.useState(new Date())
   const [selectedDate, setSelectedDate] = React.useState<string | null>(null)
+  const [sessionToEdit, setSessionToEdit] = React.useState<Session | null>(null)
   const { visible: visibleIcons, toggle: toggleVisibleIcon } = useVisibleCalendarIcons()
   const todayStr = getToday()
 
@@ -329,6 +313,7 @@ export default function Calendar() {
   const { data: gymExercises } = useListGymExercises()
   const { data: gymSets } = useListGymWorkoutSets()
   const { data: futureTasks } = useListTodoTasks({ includeFuture: true })
+  const { data: todoLists = [] } = useListTodoLists()
 
   const { data: selectedDaySessions, isLoading: isLoadingSessions } = useListSessions(
     { startDate: selectedDate || undefined, endDate: selectedDate || undefined },
@@ -384,6 +369,20 @@ export default function Calendar() {
     }
     return set
   }, [futureTasks, todayStr])
+
+  // which legend/icon types actually have a record in the visible month —
+  // keeps the legend from listing activity types that never occurred here
+  const legendPresence = React.useMemo(() => {
+    const inMonth = (date: string) => date >= startDateStr && date <= endDateStr
+    return {
+      subprojectActive: (subprojectEvents ?? []).some(e => e.eventType === "active"),
+      subprojectCompleted: (subprojectEvents ?? []).some(e => e.eventType === "completed"),
+      todoBadges: (todoSummary ?? []).some(t => t.totalTasks > 0),
+      workout: (gymWorkouts ?? []).some(w => inMonth(w.date)),
+      run: (gymRuns ?? []).some(r => inMonth(r.date)),
+      prepared: [...preparedDatesSet].some(inMonth),
+    }
+  }, [subprojectEvents, todoSummary, gymWorkouts, gymRuns, preparedDatesSet, startDateStr, endDateStr])
 
   // subproject + todo events for the selected day
   const selectedDaySubEvents = selectedDate ? (subEventsByDate.get(selectedDate) ?? []) : []
@@ -450,38 +449,51 @@ export default function Calendar() {
           </div>
         </div>
 
-        {/* legend — click an item to show/hide it on the calendar */}
+        {/* legend — click an item to show/hide it on the calendar. Only listed
+            when this month actually has a record of that activity type. */}
         <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-          <LegendItem active={visibleIcons.subprojectActive} onClick={() => toggleVisibleIcon("subprojectActive")}>
-            <div className="w-2 h-2 rounded-full bg-primary/70" />
-            <span>Active subproject day</span>
-          </LegendItem>
-          <LegendItem active={visibleIcons.subprojectCompleted} onClick={() => toggleVisibleIcon("subprojectCompleted")}>
-            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-            <span>Subproject completed</span>
-          </LegendItem>
-          <LegendItem active={visibleIcons.todoBadges} onClick={() => toggleVisibleIcon("todoBadges")}>
-            <div className="w-4 h-4 rounded text-[9px] font-bold bg-violet-500 text-white flex items-center justify-center">T</div>
-            <span>To-do list completion</span>
-          </LegendItem>
-          <LegendItem active={visibleIcons.workout} onClick={() => toggleVisibleIcon("workout")}>
-            <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shadow-sm">
-              <Dumbbell className="h-2.5 w-2.5 text-white" />
-            </div>
-            <span>Workout logged</span>
-          </LegendItem>
-          <LegendItem active={visibleIcons.run} onClick={() => toggleVisibleIcon("run")}>
-            <div className="w-4 h-4 rounded-full bg-sky-500 flex items-center justify-center shadow-sm">
-              <Footprints className="h-2.5 w-2.5 text-white" />
-            </div>
-            <span>Run logged</span>
-          </LegendItem>
-          <LegendItem active={visibleIcons.prepared} onClick={() => toggleVisibleIcon("prepared")}>
-            <div className="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center shadow-sm">
-              <CalendarPlus className="h-2.5 w-2.5 text-white" />
-            </div>
-            <span>Task prepared in advance</span>
-          </LegendItem>
+          {legendPresence.subprojectActive && (
+            <LegendItem active={visibleIcons.subprojectActive} onClick={() => toggleVisibleIcon("subprojectActive")}>
+              <div className="w-2 h-2 rounded-full bg-primary/70" />
+              <span>Active subproject day</span>
+            </LegendItem>
+          )}
+          {legendPresence.subprojectCompleted && (
+            <LegendItem active={visibleIcons.subprojectCompleted} onClick={() => toggleVisibleIcon("subprojectCompleted")}>
+              <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              <span>Subproject completed</span>
+            </LegendItem>
+          )}
+          {legendPresence.todoBadges && (
+            <LegendItem active={visibleIcons.todoBadges} onClick={() => toggleVisibleIcon("todoBadges")}>
+              <div className="w-4 h-4 rounded text-[9px] font-bold bg-violet-500 text-white flex items-center justify-center">T</div>
+              <span>To-do list completion</span>
+            </LegendItem>
+          )}
+          {legendPresence.workout && (
+            <LegendItem active={visibleIcons.workout} onClick={() => toggleVisibleIcon("workout")}>
+              <div className="w-4 h-4 rounded-full bg-orange-500 flex items-center justify-center shadow-sm">
+                <Dumbbell className="h-2.5 w-2.5 text-white" />
+              </div>
+              <span>Workout logged</span>
+            </LegendItem>
+          )}
+          {legendPresence.run && (
+            <LegendItem active={visibleIcons.run} onClick={() => toggleVisibleIcon("run")}>
+              <div className="w-4 h-4 rounded-full bg-sky-500 flex items-center justify-center shadow-sm">
+                <Footprints className="h-2.5 w-2.5 text-white" />
+              </div>
+              <span>Run logged</span>
+            </LegendItem>
+          )}
+          {legendPresence.prepared && (
+            <LegendItem active={visibleIcons.prepared} onClick={() => toggleVisibleIcon("prepared")}>
+              <div className="w-4 h-4 rounded-full bg-indigo-500 flex items-center justify-center shadow-sm">
+                <CalendarPlus className="h-2.5 w-2.5 text-white" />
+              </div>
+              <span>Task prepared in advance</span>
+            </LegendItem>
+          )}
         </div>
 
         <div className="bg-card rounded-xl border p-6 shadow-sm">
@@ -599,12 +611,16 @@ export default function Calendar() {
                         <div className="flex gap-1 flex-wrap justify-end">
                           {todoListsWithTasks.slice(0, 4).map((item) => {
                             const pct = item.percentage
+                            const listComplete = pct === 100
                             return (
                               <div
                                 key={item.listId}
-                                className="relative flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold text-white shadow-sm overflow-hidden"
+                                className={cn(
+                                  "relative flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold text-white shadow-sm overflow-hidden",
+                                  listComplete && "ring-2 ring-amber-400",
+                                )}
                                 style={{ backgroundColor: item.listColor }}
-                                title={`${item.listName}: ${pct}%`}
+                                title={`${item.listName}: ${pct}%${listComplete ? " — all done!" : ""}`}
                               >
                                 {/* fill indicator */}
                                 <div
@@ -641,27 +657,32 @@ export default function Calendar() {
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-6">
 
-              {/* todo list summaries */}
-              {selectedDayTodos.filter(t => t.totalTasks > 0).length > 0 && (
+              {/* todo lists — every list shows up here, with an inline "add a
+                  task" box at the bottom of its expanded view, whether or not
+                  it has any tasks active yet on this day */}
+              {selectedDate && todoLists.length > 0 && (
                 <div>
                   <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                     To-Do Progress
                   </h3>
                   <div className="space-y-2">
-                    {selectedDayTodos.filter(t => t.totalTasks > 0).map(item => (
-                      <TodoDayPanel key={item.listId} item={item} date={selectedDate!} isToday={selectedDate === todayStr} />
-                    ))}
+                    {todoLists.map(list => {
+                      const summary = selectedDayTodos.find(t => t.listId === list.id)
+                      return (
+                        <TodoDayPanel
+                          key={list.id}
+                          list={list}
+                          stats={{
+                            totalTasks: summary?.totalTasks ?? 0,
+                            completedTasks: summary?.completedTasks ?? 0,
+                            percentage: summary?.percentage ?? 0,
+                          }}
+                          date={selectedDate}
+                          isToday={selectedDate === todayStr}
+                        />
+                      )
+                    })}
                   </div>
-                </div>
-              )}
-
-              {/* prepare a task for a future day */}
-              {selectedDate && selectedDate > todayStr && (
-                <div>
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-                    Prepare a Task
-                  </h3>
-                  <AddFutureTaskForm date={selectedDate} />
                 </div>
               )}
 
@@ -768,7 +789,7 @@ export default function Calendar() {
                 ) : (
                   <div className="space-y-3">
                     {selectedDaySessions.map(session => (
-                      <div key={session.id} className="p-4 rounded-lg border bg-card shadow-sm flex flex-col gap-2">
+                      <div key={session.id} className="p-4 rounded-lg border bg-card shadow-sm flex flex-col gap-2 group">
                         <div className="flex items-start justify-between">
                           <div className="space-y-0.5">
                             {session.projectName ? (
@@ -783,7 +804,16 @@ export default function Calendar() {
                               <p className="text-xs text-muted-foreground ml-4">↳ {session.subprojectName}</p>
                             )}
                           </div>
-                          <div className="font-mono font-bold text-primary text-sm">{formatDuration(session.durationMinutes)}</div>
+                          <div className="flex items-center gap-2">
+                            <div className="font-mono font-bold text-primary text-sm">{formatDuration(session.durationMinutes)}</div>
+                            <button
+                              onClick={() => setSessionToEdit(session)}
+                              title="Edit session"
+                              className="p-1 rounded hover:bg-muted transition-colors opacity-0 group-hover:opacity-100"
+                            >
+                              <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                            </button>
+                          </div>
                         </div>
                         {(session.startTime || session.endTime) && (
                           <div className="text-xs font-mono text-muted-foreground bg-muted/50 px-2 py-1 rounded w-fit">
@@ -804,6 +834,12 @@ export default function Calendar() {
           </ScrollArea>
         </SheetContent>
       </Sheet>
+
+      <EditSessionDialog
+        session={sessionToEdit}
+        open={!!sessionToEdit}
+        onOpenChange={(open) => !open && setSessionToEdit(null)}
+      />
     </Layout>
   )
 }

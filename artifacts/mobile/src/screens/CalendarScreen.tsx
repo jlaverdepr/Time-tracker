@@ -360,11 +360,19 @@ function DayDetailModal({ date, onClose, color }: { date: string | null; onClose
                       <View style={[styles.iconCircle, { backgroundColor: '#0ea5e9' }]}>
                         <Ionicons name="walk" size={13} color="#fff" />
                       </View>
-                      <Text style={[styles.panelTitle, { color: color.foreground, flex: 1 }]}>Run</Text>
-                      {run.distanceKm != null && <Text style={[styles.runStat, { color: '#0284c7' }]}>{run.distanceKm} km</Text>}
-                      {run.durationSeconds != null && <Text style={[styles.runStatMuted, { color: color.mutedForeground }]}>{formatRunTime(run.durationSeconds)}</Text>}
-                      {speed && <Text style={[styles.runPill, { color: color.mutedForeground, backgroundColor: '#0ea5e91a' }]}>{speed}</Text>}
-                      {pace && <Text style={[styles.runPill, { color: color.mutedForeground, backgroundColor: '#0ea5e91a' }]}>{pace}</Text>}
+                      <View style={{ flex: 1, minWidth: 0, gap: 4 }}>
+                        <View style={styles.runHeader}>
+                          <Text style={[styles.panelTitle, { color: color.foreground }]}>Run</Text>
+                          {run.durationSeconds != null && <Text style={[styles.runStatMuted, { color: color.mutedForeground }]}>{formatRunTime(run.durationSeconds)}</Text>}
+                        </View>
+                        {(run.distanceKm != null || speed || pace) && (
+                          <View style={styles.runStats}>
+                            {run.distanceKm != null && <Text style={[styles.runStat, { color: '#0284c7' }]}>{run.distanceKm} km</Text>}
+                            {speed && <Text style={[styles.runPill, { color: color.mutedForeground, backgroundColor: '#0ea5e91a' }]}>{speed}</Text>}
+                            {pace && <Text style={[styles.runPill, { color: color.mutedForeground, backgroundColor: '#0ea5e91a' }]}>{pace}</Text>}
+                          </View>
+                        )}
+                      </View>
                     </View>
                   );
                 })}
@@ -632,7 +640,9 @@ const styles = StyleSheet.create({
   exerciseName: { fontSize: 13, fontWeight: '600' },
   setsSummary: { fontSize: 11, marginLeft: 12 },
 
-  runRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
+  runRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: 12, borderRadius: 12, borderWidth: 1 },
+  runHeader: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
+  runStats: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
   runStat: { fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
   runStatMuted: { fontSize: 12, fontVariant: ['tabular-nums'] },
   runPill: { fontSize: 10, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, overflow: 'hidden', fontVariant: ['tabular-nums'] },

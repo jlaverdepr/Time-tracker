@@ -1,14 +1,13 @@
 import * as React from "react"
-import { format } from "date-fns"
+import { format, parseISO } from "date-fns"
 import { Layout } from "@/components/layout/layout"
 import {
   useListTodoLists, useCreateTodoList, useUpdateTodoList, useDeleteTodoList,
-  useListTodoTasks, useCreateTodoTask, useUpdateTodoTask, useDeleteTodoTask,
-  useCompleteTodoTask, useUncompleteTodoTask, useClearCompletedTodoTasks,
+  useListTodoEntries, useCreateTodoEntry, useUpdateTodoEntry, useDeleteTodoEntry,
+  useUpdateTodoTask, useClearCompletedTodoEntries,
   useListProjects, useListSubprojects,
-  getListTodoListsQueryKey, getListTodoTasksQueryKey,
 } from "@workspace/api-client-react"
-import type { TodoList, TodoTask, Project, Subproject } from "@workspace/api-client-react"
+import type { TodoList, TodoEntry, TodoCarryMode, Project, Subproject } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
@@ -22,7 +21,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { TODO_LIST_COLORS, completionRate, isTaskComplete, todayStr } from "@workspace/shared"
+import { TODO_LIST_COLORS, dayProgress, isEntryDone, todayStr, invalidateTodoQueries } from "@workspace/shared"
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -30,12 +29,16 @@ const listSchema = z.object({
   name: z.string().min(1, "Name is required"),
   color: z.string().min(1),
   letter: z.string().length(1, "One character only").toUpperCase(),
-  resetDaily: z.boolean(),
+  carryMode: z.enum(["carry", "repeat", "none"]),
   autoClearCompleted: z.boolean(),
 })
 type ListFormValues = z.infer<typeof listSchema>
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+const CARRY_MODES: { value: TodoCarryMode; label: string; description: string; short: string }[] = [
+  { value: "carry", label: "Carry over", description: "Unfinished tasks move to the next day", short: "carry" },
+  { value: "repeat", label: "Repeat daily", description: "Every task comes back fresh each day", short: "daily" },
+  { value: "none", label: "Single day", description: "Tasks stay on the day they were added", short: "one day" },
+]
 
 // ── progress ring ─────────────────────────────────────────────────────────────
 
@@ -57,7 +60,6 @@ function ProgressRing({ pct, color, size = 28 }: { pct: number; color: string; s
 function TaskItem({
   task,
   listId,
-  resetDaily,
   projects,
   subprojectsByProject,
   onComplete,
@@ -70,9 +72,8 @@ function TaskItem({
   onDropRow,
   onDragEndTask,
 }: {
-  task: TodoTask
+  task: TodoEntry
   listId: number
-  resetDaily: boolean
   projects: Project[]
   subprojectsByProject: Map<number, Subproject[]>
   onComplete: (id: number) => void
@@ -85,7 +86,9 @@ function TaskItem({
   onDropRow?: () => void
   onDragEndTask?: () => void
 }) {
-  const done = isTaskComplete(task, resetDaily)
+  const done = isEntryDone(task)
+  // Completed on an earlier day and still shown until cleared (list keeps completed tasks)
+  const earlierDay = task.date < todayStr() ? format(parseISO(task.date), "EEE d MMM") : null
   const [editing, setEditing] = React.useState(false)
   const [editValue, setEditValue] = React.useState(task.text)
   const [editingReminder, setEditingReminder] = React.useState(false)
@@ -99,24 +102,24 @@ function TaskItem({
 
   function handleSubmitEdit() {
     const trimmed = editValue.trim()
-    if (trimmed && trimmed !== task.text) onUpdate(task.id, { text: trimmed })
+    if (trimmed && trimmed !== task.text) onUpdate(task.taskId, { text: trimmed })
     setEditing(false)
   }
 
   function handleSubmitReminder() {
     const trimmed = reminderValue.trim()
-    onUpdate(task.id, { reminderTime: trimmed || null })
+    onUpdate(task.taskId, { reminderTime: trimmed || null })
     setEditingReminder(false)
   }
 
   function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const pid = e.target.value ? Number(e.target.value) : null
-    onUpdate(task.id, { projectId: pid, subprojectId: null })
+    onUpdate(task.taskId, { projectId: pid, subprojectId: null })
   }
 
   function handleSubprojectChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const sid = e.target.value ? Number(e.target.value) : null
-    onUpdate(task.id, { subprojectId: sid })
+    onUpdate(task.taskId, { subprojectId: sid })
   }
 
   const assignedProject = task.projectId != null ? projects.find(p => p.id === task.projectId) : null
@@ -200,6 +203,15 @@ function TaskItem({
             onDoubleClick={!done ? () => { setEditValue(task.text); setEditing(true) } : undefined}
           >
             {task.text}
+          </span>
+        )}
+
+        {!editing && earlierDay && (
+          <span className="text-[10px] text-muted-foreground shrink-0" title={`Completed on ${task.date}`}>{earlierDay}</span>
+        )}
+        {!editing && !done && task.copiedFromDate && (
+          <span className="text-[10px] text-muted-foreground/70 shrink-0" title={`Carried over from ${task.copiedFromDate}`}>
+            carried
           </span>
         )}
 
@@ -393,7 +405,7 @@ function ListCard({
   onTaskDragEnd,
 }: {
   list: TodoList
-  tasks: TodoTask[]
+  tasks: TodoEntry[]
   projects: Project[]
   subprojectsByProject: Map<number, Subproject[]>
   suggestions: string[]
@@ -412,7 +424,7 @@ function ListCard({
   onDropCard: () => void
   onDragEndCard: () => void
   draggedTaskId: number | null
-  draggedTaskData: TodoTask | null
+  draggedTaskData: TodoEntry | null
   previewListId: number | null
   previewOrderIds: number[] | null
   onTaskDragStart: (taskId: number, listId: number) => void
@@ -426,10 +438,11 @@ function ListCard({
   const inputRef = React.useRef<HTMLInputElement>(null)
   const contentRef = React.useRef<HTMLDivElement>(null)
   const { manualHeight, handleMouseDown } = useResizableHeight(`todo-list-height-${list.id}`)
-  const pct = completionRate(tasks, list.resetDaily)
-  const doneTasks = tasks.filter(t => isTaskComplete(t, list.resetDaily))
-  const activeTasks = tasks.filter(t => !isTaskComplete(t, list.resetDaily))
-  const complete = tasks.length > 0 && pct === 100
+  // Progress is today's entries only; earlier-day completed entries are just still on display.
+  const { done: doneToday, total: totalToday, percentage: pct } = dayProgress(tasks, todayStr())
+  const doneTasks = tasks.filter(isEntryDone)
+  const activeTasks = tasks.filter(t => !isEntryDone(t))
+  const complete = totalToday > 0 && pct === 100
 
   // Live drag preview: while this list is the current drop target, render
   // tasks in the hovered order (with the dragged task's slot as a gap) —
@@ -442,7 +455,7 @@ function ListCard({
     if (isPreviewTarget && previewOrderIds) {
       const byId = new Map(activeTasks.map(t => [t.id, t]))
       if (draggedTaskData && !byId.has(draggedTaskData.id)) byId.set(draggedTaskData.id, draggedTaskData)
-      return previewOrderIds.map(id => byId.get(id)).filter((t): t is TodoTask => !!t)
+      return previewOrderIds.map(id => byId.get(id)).filter((t): t is TodoEntry => !!t)
     }
     if (draggedFromHere) {
       return activeTasks.filter(t => t.id !== draggedTaskId)
@@ -529,8 +542,8 @@ function ListCard({
         <div className="flex-1 min-w-0">
           <div className="font-semibold text-sm truncate leading-tight">{list.name}</div>
           <div className="text-xs text-muted-foreground leading-tight">
-            {doneTasks.length}/{tasks.length}
-            {list.resetDaily && " · daily"}
+            {doneToday}/{totalToday} today
+            {" · "}{CARRY_MODES.find(m => m.value === list.carryMode)?.short}
             {list.autoClearCompleted && " · auto-clear"}
           </div>
         </div>
@@ -613,7 +626,7 @@ function ListCard({
                   <div className="h-4" />
                 </div>
               ) : (
-                <TaskItem key={task.id} task={task} listId={list.id} resetDaily={list.resetDaily}
+                <TaskItem key={task.id} task={task} listId={list.id}
                   projects={projects} subprojectsByProject={subprojectsByProject}
                   onComplete={onComplete} onUncomplete={onUncomplete}
                   onDelete={onDelete} onUpdate={onUpdate}
@@ -640,7 +653,7 @@ function ListCard({
                   <div className="flex-1 h-px bg-border" />
                 </div>
                 {doneTasks.map(task => (
-                  <TaskItem key={task.id} task={task} listId={list.id} resetDaily={list.resetDaily}
+                  <TaskItem key={task.id} task={task} listId={list.id}
                     projects={projects} subprojectsByProject={subprojectsByProject}
                     onComplete={onComplete} onUncomplete={onUncomplete}
                     onDelete={onDelete} onUpdate={onUpdate} />
@@ -663,19 +676,19 @@ export default function Todos() {
   const { toast } = useToast()
 
   const { data: lists = [], isLoading: listsLoading } = useListTodoLists()
-  const { data: allTasks = [] } = useListTodoTasks()
+  // Today's entries, plus earlier days' completed ones for lists that keep them visible
+  const { data: allTasks = [] } = useListTodoEntries({ includeEarlierDone: true })
   const { data: projects = [] } = useListProjects()
   const { data: allSubprojects = [] } = useListSubprojects()
 
   const createList = useCreateTodoList()
   const updateList = useUpdateTodoList()
   const deleteList = useDeleteTodoList()
-  const createTask = useCreateTodoTask()
+  const createEntry = useCreateTodoEntry()
+  const updateEntry = useUpdateTodoEntry()
+  const deleteEntry = useDeleteTodoEntry()
   const updateTask = useUpdateTodoTask()
-  const deleteTask = useDeleteTodoTask()
-  const completeTask = useCompleteTodoTask()
-  const uncompleteTask = useUncompleteTodoTask()
-  const clearCompleted = useClearCompletedTodoTasks()
+  const clearCompleted = useClearCompletedTodoEntries()
 
   const [addingList, setAddingList] = React.useState(false)
   const [editingList, setEditingList] = React.useState<TodoList | null>(null)
@@ -687,12 +700,11 @@ export default function Todos() {
   const [previewOrderIds, setPreviewOrderIds] = React.useState<number[] | null>(null)
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: getListTodoListsQueryKey() })
-    queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
+    invalidateTodoQueries(queryClient)
   }
 
   const tasksByList = React.useMemo(() => {
-    const map = new Map<number, TodoTask[]>()
+    const map = new Map<number, TodoEntry[]>()
     for (const t of allTasks) {
       if (!map.has(t.listId)) map.set(t.listId, [])
       map.get(t.listId)!.push(t)
@@ -702,24 +714,16 @@ export default function Todos() {
 
   const listsById = React.useMemo(() => new Map(lists.map(l => [l.id, l])), [lists])
 
-  // Most-recently-used distinct task text, across all lists, for the
+  // Distinct task text on screen, most recent day first, for the
   // "add a task" autocomplete dropdown.
   const taskTextHistory = React.useMemo(() => {
-    const mostRecentTs = new Map<string, number>()
-    const original = new Map<string, string>()
-    for (const t of allTasks) {
+    const seen = new Map<string, string>()
+    for (const t of [...allTasks].sort((a, b) => b.date.localeCompare(a.date))) {
       const trimmed = t.text.trim()
       const key = trimmed.toLowerCase()
-      if (!key) continue
-      const ts = new Date(t.createdAt).getTime()
-      if (!mostRecentTs.has(key) || ts > mostRecentTs.get(key)!) {
-        mostRecentTs.set(key, ts)
-        original.set(key, trimmed)
-      }
+      if (key && !seen.has(key)) seen.set(key, trimmed)
     }
-    return Array.from(original.entries())
-      .sort((a, b) => mostRecentTs.get(b[0])! - mostRecentTs.get(a[0])!)
-      .map(([, text]) => text)
+    return Array.from(seen.values())
   }, [allTasks])
 
   const subprojectsByProject = React.useMemo(() => {
@@ -734,17 +738,17 @@ export default function Todos() {
   // ── list form ──
   const listForm = useForm<ListFormValues>({
     resolver: zodResolver(listSchema),
-    defaultValues: { name: "", color: TODO_LIST_COLORS[0], letter: "A", resetDaily: false, autoClearCompleted: false },
+    defaultValues: { name: "", color: TODO_LIST_COLORS[0], letter: "A", carryMode: "carry", autoClearCompleted: false },
   })
 
   function openAddList() {
-    listForm.reset({ name: "", color: TODO_LIST_COLORS[Math.floor(Math.random() * TODO_LIST_COLORS.length)], letter: "A", resetDaily: false, autoClearCompleted: false })
+    listForm.reset({ name: "", color: TODO_LIST_COLORS[Math.floor(Math.random() * TODO_LIST_COLORS.length)], letter: "A", carryMode: "carry", autoClearCompleted: false })
     setEditingList(null)
     setAddingList(true)
   }
 
   function openEditList(list: TodoList) {
-    listForm.reset({ name: list.name, color: list.color, letter: list.letter, resetDaily: list.resetDaily, autoClearCompleted: list.autoClearCompleted })
+    listForm.reset({ name: list.name, color: list.color, letter: list.letter, carryMode: list.carryMode, autoClearCompleted: list.autoClearCompleted })
     setEditingList(list)
     setAddingList(true)
   }
@@ -777,30 +781,32 @@ export default function Todos() {
 
   // ── task handlers ──
   function handleAddTask(listId: number, text: string) {
-    createTask.mutate({ data: { listId, text } }, {
+    createEntry.mutate({ data: { listId, text } }, {
       onSuccess: () => invalidate(),
     })
   }
 
-  function handleComplete(id: number) {
-    completeTask.mutate({ id }, { onSuccess: () => invalidate() })
+  // Entry ids: completing/deleting acts on that day's entry (and its copies).
+  function handleComplete(entryId: number) {
+    updateEntry.mutate({ id: entryId, data: { status: "done" } }, { onSuccess: () => invalidate() })
   }
 
-  function handleUncomplete(id: number) {
-    uncompleteTask.mutate({ id }, { onSuccess: () => invalidate() })
+  function handleUncomplete(entryId: number) {
+    updateEntry.mutate({ id: entryId, data: { status: "pending" } }, { onSuccess: () => invalidate() })
   }
 
-  function handleDeleteTask(id: number) {
-    deleteTask.mutate({ id }, { onSuccess: () => invalidate() })
+  function handleDeleteTask(entryId: number) {
+    deleteEntry.mutate({ id: entryId }, { onSuccess: () => invalidate() })
   }
 
+  // Task ids: text/project/reminder edits apply to the task on every day.
   function handleUpdateTask(id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null; reminderTime?: string | null }) {
     updateTask.mutate({ id, data }, { onSuccess: () => invalidate() })
   }
 
   function handleClearCompleted(listId: number) {
     clearCompleted.mutate({ id: listId }, {
-      onSuccess: (result) => { invalidate(); toast({ title: `Cleared ${result.clearedCount} task${result.clearedCount === 1 ? "" : "s"}` }) },
+      onSuccess: (result) => { invalidate(); toast({ title: `Cleared ${result.clearedCount} task${result.clearedCount === 1 ? "" : "s"}`, description: "Hidden here; the calendar keeps their history." }) },
     })
   }
 
@@ -833,10 +839,9 @@ export default function Todos() {
   // Live-previews the drop position as the pointer moves (like rearranging
   // iOS home screen icons) rather than only reacting on drop, so the user
   // can see exactly where an item will land while still dragging it.
-  function activeTasksFor(listId: number): TodoTask[] {
-    const list = listsById.get(listId)
-    if (!list) return []
-    return (tasksByList.get(listId) ?? []).filter(t => !isTaskComplete(t, list.resetDaily))
+  function activeTasksFor(listId: number): TodoEntry[] {
+    if (!listsById.has(listId)) return []
+    return (tasksByList.get(listId) ?? []).filter(t => !isEntryDone(t))
   }
 
   function handleTaskDragStart(taskId: number, listId: number) {
@@ -876,7 +881,7 @@ export default function Todos() {
       const sourceArr = activeTasksFor(dragged.listId).filter(t => t.id !== dragged.id)
       sourceArr.forEach((t, idx) => {
         if (t.sortOrder !== idx) {
-          updateTask.mutate({ id: t.id, data: { sortOrder: idx } }, { onSuccess: () => invalidate() })
+          updateTask.mutate({ id: t.taskId, data: { sortOrder: idx } }, { onSuccess: () => invalidate() })
         }
       })
     }
@@ -884,16 +889,16 @@ export default function Todos() {
     const draggedTaskObj = tasksByList.get(dragged.listId)?.find(t => t.id === dragged.id)
     order.forEach((id, idx) => {
       if (id === dragged.id) {
-        if (listChanged || draggedTaskObj?.sortOrder !== idx) {
+        if (draggedTaskObj && (listChanged || draggedTaskObj.sortOrder !== idx)) {
           updateTask.mutate(
-            { id, data: listChanged ? { listId: targetListId, sortOrder: idx } : { sortOrder: idx } },
+            { id: draggedTaskObj.taskId, data: listChanged ? { listId: targetListId, sortOrder: idx } : { sortOrder: idx } },
             { onSuccess: () => invalidate() },
           )
         }
       } else {
         const t = (tasksByList.get(targetListId) ?? []).find(x => x.id === id)
         if (t && t.sortOrder !== idx) {
-          updateTask.mutate({ id, data: { sortOrder: idx } }, { onSuccess: () => invalidate() })
+          updateTask.mutate({ id: t.taskId, data: { sortOrder: idx } }, { onSuccess: () => invalidate() })
         }
       }
     })
@@ -1036,20 +1041,26 @@ export default function Todos() {
                 )} />
               </div>
 
-              <FormField control={listForm.control} name="resetDaily" render={({ field }) => (
+              <FormField control={listForm.control} name="carryMode" render={({ field }) => (
                 <FormItem>
-                  <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => field.onChange(!field.value)}>
-                    <div className={cn(
-                      "w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all",
-                      field.value ? "border-primary bg-primary" : "border-border"
-                    )}>
-                      {field.value && <Check className="h-3 w-3 text-white" />}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Reset daily</p>
-                      <p className="text-xs text-muted-foreground">Tasks revert to incomplete each day</p>
-                    </div>
+                  <FormLabel>When a new day starts</FormLabel>
+                  <div className="grid gap-1.5">
+                    {CARRY_MODES.map(m => (
+                      <button key={m.value} type="button" onClick={() => field.onChange(m.value)}
+                        className={cn(
+                          "flex items-center gap-3 p-2.5 rounded-lg border text-left transition-colors",
+                          field.value === m.value ? "border-primary bg-primary/5" : "bg-muted/30 hover:bg-muted/50",
+                        )}>
+                        <div className={cn(
+                          "w-4 h-4 rounded-full border-2 shrink-0 transition-all",
+                          field.value === m.value ? "border-primary border-[5px]" : "border-border",
+                        )} />
+                        <div>
+                          <p className="text-sm font-medium">{m.label}</p>
+                          <p className="text-xs text-muted-foreground">{m.description}</p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 </FormItem>
               )} />
@@ -1066,7 +1077,7 @@ export default function Todos() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">Auto-clear completed tasks</p>
-                      <p className="text-xs text-muted-foreground">Hide completed tasks once the day ends</p>
+                      <p className="text-xs text-muted-foreground">Completed tasks leave this view when the day ends (the calendar keeps them)</p>
                     </div>
                   </div>
                 </FormItem>

@@ -3,11 +3,10 @@ import { format, startOfWeek, endOfWeek } from "date-fns"
 import { Layout } from "@/components/layout/layout"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
-  useGetStats, useGetRecentSessions, useListTodoLists, useListTodoTasks, useListGymWorkouts,
+  useGetStats, useGetRecentSessions, useListTodoLists, useListTodoEntries, useListGymWorkouts,
 } from "@workspace/api-client-react"
-import type { TodoTask } from "@workspace/api-client-react"
 import { Clock, CalendarDays, Calendar as CalendarIcon, History, ListChecks, Dumbbell } from "lucide-react"
-import { formatDuration, isTaskComplete } from "@workspace/shared"
+import { formatDuration, isEntryDone } from "@workspace/shared"
 
 function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
@@ -24,7 +23,7 @@ export default function Dashboard() {
   const { data: stats, isLoading: isStatsLoading } = useGetStats()
   const { data: recentSessions, isLoading: isSessionsLoading } = useGetRecentSessions({ limit: 10 })
   const { data: lists = [] } = useListTodoLists()
-  const { data: allTasks = [] } = useListTodoTasks()
+  const { data: allTasks = [] } = useListTodoEntries() // today's entries
   const { data: gymWorkouts = [] } = useListGymWorkouts()
 
   const workoutsThisWeek = React.useMemo(() => {
@@ -33,11 +32,11 @@ export default function Dashboard() {
     return gymWorkouts.filter(w => w.date >= weekStart && w.date <= weekEnd).length
   }, [gymWorkouts])
 
-  // Per-list task counts
+  // Per-list counts for today
   const listStats = React.useMemo(() => lists.map(list => {
     const tasks = allTasks.filter(t => t.listId === list.id)
     const total = tasks.length
-    const done = tasks.filter(t => isTaskComplete(t, list.resetDaily)).length
+    const done = tasks.filter(isEntryDone).length
     const pct = total === 0 ? 0 : Math.round((done / total) * 100)
     return { list, total, done, pct }
   }), [lists, allTasks])
@@ -168,7 +167,7 @@ export default function Dashboard() {
                           {list.letter}
                         </div>
                         <CardTitle className="text-sm font-semibold">{list.name}</CardTitle>
-                        {list.resetDaily && (
+                        {list.carryMode === "repeat" && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium">daily</span>
                         )}
                       </div>

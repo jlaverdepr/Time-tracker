@@ -2,14 +2,12 @@ import * as React from "react"
 import { Layout } from "@/components/layout/layout"
 import {
   useGetCalendar, useListSessions, useGetSubprojectCalendarEvents,
-  useGetTodoCalendarSummary, useListGymWorkouts, useListGymRuns,
+  useGetTodoDaySummary, useListGymWorkouts, useListGymRuns,
   useListGymWorkoutEntries, useListGymExercises, useListGymWorkoutSets,
-  useListTodoTasks, useListTodoLists, useCreateTodoTask, useDeleteTodoTask,
-  useCompleteTodoTask, useUncompleteTodoTask,
-  useGetTodoDayDetail, useToggleTodoDayDetailTask,
-  getListTodoTasksQueryKey, getGetTodoDayDetailQueryKey,
+  useListTodoLists, useListTodoEntries, useCreateTodoEntry, useUpdateTodoEntry, useDeleteTodoEntry,
+  getListTodoEntriesQueryKey,
 } from "@workspace/api-client-react"
-import type { SubprojectCalendarEvent, TodoCalendarSummaryItem } from "@workspace/api-client-react"
+import type { SubprojectCalendarEvent, TodoDaySummary, TodoList } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval,
@@ -26,7 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { SessionDialog } from "@/components/session-dialog"
 import { ConfettiBurst } from "@/components/confetti-burst"
 import type { Session } from "@workspace/api-client-react"
-import { categoryColor, formatDuration, formatPace, formatRunTime, formatSpeed, todayStr } from "@workspace/shared"
+import { categoryColor, formatDuration, formatPace, formatRunTime, formatSpeed, todayStr, invalidateTodoQueries } from "@workspace/shared"
 
 type CalendarIconKey = "subprojectActive" | "subprojectCompleted" | "todoBadges" | "workout" | "run" | "prepared"
 
@@ -73,11 +71,10 @@ function LegendItem({ active, onClick, children }: { active: boolean; onClick: (
 
 // ── expandable to-do list panel ─────────────────────────────────────────────────
 
-function TodoDayPanel({ list, stats, date, isToday: dayIsToday }: {
+function TodoDayPanel({ list, stats, date }: {
   list: { id: number; name: string; color: string; letter: string }
   stats: { totalTasks: number; completedTasks: number; percentage: number }
   date: string
-  isToday: boolean
 }) {
   const [expanded, setExpanded] = React.useState(false)
   const [newTaskText, setNewTaskText] = React.useState("")
@@ -91,41 +88,35 @@ function TodoDayPanel({ list, stats, date, isToday: dayIsToday }: {
     prevCompleteRef.current = complete
   }, [complete])
 
-  const { data: dayTasks, isLoading } = useGetTodoDayDetail(
-    { listId: list.id, date },
-    { query: { enabled: expanded, queryKey: ["todo-day-detail", list.id, date] } }
+  // This day's entries for this list — the same rows the percentage is computed from.
+  const { data: dayTasks, isLoading } = useListTodoEntries(
+    { date, listId: list.id },
+    { query: { enabled: expanded, queryKey: getListTodoEntriesQueryKey({ date, listId: list.id }) } },
   )
 
-  const toggleDayTask = useToggleTodoDayDetailTask()
-  const completeTask = useCompleteTodoTask()
-  const uncompleteTask = useUncompleteTodoTask()
-  const deleteTask = useDeleteTodoTask()
-  const createTask = useCreateTodoTask()
+  const updateEntry = useUpdateTodoEntry()
+  const deleteEntry = useDeleteTodoEntry()
+  const createEntry = useCreateTodoEntry()
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ["todo-day-detail", list.id, date] })
-    queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
-    queryClient.invalidateQueries({ queryKey: ["todo-calendar"] })
+    invalidateTodoQueries(queryClient)
   }
 
-  function handleToggle(taskId: number, nextCompleted: boolean) {
-    if (dayIsToday) {
-      if (nextCompleted) completeTask.mutate({ id: taskId }, { onSuccess: invalidate })
-      else uncompleteTask.mutate({ id: taskId }, { onSuccess: invalidate })
-    } else {
-      toggleDayTask.mutate({ data: { taskId, date, completed: nextCompleted } }, { onSuccess: invalidate })
-    }
+  // Same call for any day: completing a past entry removes the copies carried
+  // from it; un-completing one carries it forward again.
+  function handleToggle(entryId: number, nextDone: boolean) {
+    updateEntry.mutate({ id: entryId, data: { status: nextDone ? "done" : "pending" } }, { onSuccess: invalidate })
   }
 
-  function handleDelete(e: React.MouseEvent, taskId: number) {
+  function handleDelete(e: React.MouseEvent, entryId: number) {
     e.stopPropagation()
-    deleteTask.mutate({ id: taskId }, { onSuccess: invalidate })
+    deleteEntry.mutate({ id: entryId }, { onSuccess: invalidate })
   }
 
   function handleAddTask(e: React.FormEvent) {
     e.preventDefault()
     if (!newTaskText.trim()) return
-    createTask.mutate({ data: { listId: list.id, text: newTaskText.trim(), scheduledDate: date } }, {
+    createEntry.mutate({ data: { listId: list.id, text: newTaskText.trim(), date } }, {
       onSuccess: () => { invalidate(); setNewTaskText("") },
     })
   }
@@ -174,28 +165,36 @@ function TodoDayPanel({ list, stats, date, isToday: dayIsToday }: {
           ) : !dayTasks || dayTasks.length === 0 ? (
             <p className="text-xs text-muted-foreground py-2">No tasks for this day.</p>
           ) : (
-            dayTasks.map(task => (
-              <div key={task.taskId} className="flex items-center gap-1 group/task">
+            dayTasks.map(task => {
+              const done = task.status === "done"
+              return (
+              <div key={task.id} className="flex items-center gap-1 group/task">
                 <button
-                  onClick={() => handleToggle(task.taskId, !task.completed)}
+                  onClick={() => handleToggle(task.id, !done)}
                   className="flex-1 min-w-0 flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted/40 transition-colors text-left"
                 >
-                  {task.completed
+                  {done
                     ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                     : <Circle className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />}
-                  <span className={cn("text-sm truncate", task.completed && "line-through text-muted-foreground")}>
+                  <span className={cn("text-sm truncate", done && "line-through text-muted-foreground")}>
                     {task.text}
                   </span>
+                  {task.copiedFromDate && (
+                    <span className="ml-auto text-[10px] text-muted-foreground/70 shrink-0" title={`Carried over from ${task.copiedFromDate}`}>
+                      from {format(parseISO(task.copiedFromDate), "EEE d")}
+                    </span>
+                  )}
                 </button>
                 <button
-                  onClick={e => handleDelete(e, task.taskId)}
+                  onClick={e => handleDelete(e, task.id)}
                   title="Delete task"
                   className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors opacity-0 group-hover/task:opacity-100 shrink-0"
                 >
                   <Trash2 className="h-3 w-3 text-muted-foreground" />
                 </button>
               </div>
-            ))
+              )
+            })
           )}
 
           <form onSubmit={handleAddTask} className="flex items-center gap-1.5 pt-1">
@@ -292,17 +291,13 @@ export default function Calendar() {
     { query: { queryKey: ["subproject-events", startDateStr, endDateStr] } }
   )
 
-  const { data: todoSummary } = useGetTodoCalendarSummary(
-    { startDate: startDateStr, endDate: endDateStr },
-    { query: { queryKey: ["todo-calendar", startDateStr, endDateStr] } }
-  )
+  const { data: todoSummary } = useGetTodoDaySummary({ startDate: startDateStr, endDate: endDateStr })
 
   const { data: gymWorkouts } = useListGymWorkouts()
   const { data: gymRuns } = useListGymRuns()
   const { data: gymEntries } = useListGymWorkoutEntries()
   const { data: gymExercises } = useListGymExercises()
   const { data: gymSets } = useListGymWorkoutSets()
-  const { data: futureTasks } = useListTodoTasks({ includeFuture: true })
   const { data: todoLists = [] } = useListTodoLists()
 
   const { data: selectedDaySessions, isLoading: isLoadingSessions } = useListSessions(
@@ -331,15 +326,20 @@ export default function Calendar() {
     return map
   }, [subprojectEvents])
 
-  // index todo summary by date → list letter
+  // index todo summary by date. A list's badge shows on a day exactly when it
+  // has entries (pending or done) that day — including tasks set up ahead.
   const todoByDate = React.useMemo(() => {
-    const map = new Map<string, TodoCalendarSummaryItem[]>()
+    const listsById = new Map(todoLists.map(l => [l.id, l]))
+    const map = new Map<string, (TodoDaySummary & { list: TodoList })[]>()
     for (const item of todoSummary ?? []) {
+      const list = listsById.get(item.listId)
+      if (!list) continue
       if (!map.has(item.date)) map.set(item.date, [])
-      map.get(item.date)!.push(item)
+      map.get(item.date)!.push({ ...item, list })
     }
+    for (const items of map.values()) items.sort((a, b) => a.list.sortOrder - b.list.sortOrder)
     return map
-  }, [todoSummary])
+  }, [todoSummary, todoLists])
 
   // set of dates that have a logged gym workout
   const gymDatesSet = React.useMemo(() => {
@@ -351,14 +351,10 @@ export default function Calendar() {
     return new Set((gymRuns ?? []).map(r => r.date))
   }, [gymRuns])
 
-  // set of future dates that have a "prepared" task
+  // set of future dates that have tasks set up in advance
   const preparedDatesSet = React.useMemo(() => {
-    const set = new Set<string>()
-    for (const t of futureTasks ?? []) {
-      if (t.scheduledDate && t.scheduledDate > today) set.add(t.scheduledDate)
-    }
-    return set
-  }, [futureTasks, today])
+    return new Set((todoSummary ?? []).filter(t => t.date > today).map(t => t.date))
+  }, [todoSummary, today])
 
   // which legend/icon types actually have a record in the visible month —
   // keeps the legend from listing activity types that never occurred here
@@ -510,9 +506,7 @@ export default function Calendar() {
                 const subEvents = subEventsByDate.get(dStr) ?? []
                 const completedSubEvents = subEvents.filter(e => e.eventType === "completed")
                 const activeSubEvents = subEvents.filter(e => e.eventType === "active")
-                const todosForDay = todoByDate.get(dStr) ?? []
-                // Only show lists that have tasks
-                const todoListsWithTasks = todosForDay.filter(t => t.totalTasks > 0)
+                const todoListsWithTasks = todoByDate.get(dStr) ?? []
                 const hasPrepared = preparedDatesSet.has(dStr)
 
                 return (
@@ -609,15 +603,15 @@ export default function Calendar() {
                                   "relative flex items-center justify-center w-5 h-5 rounded text-[9px] font-bold text-white shadow-sm overflow-hidden",
                                   listComplete && "ring-2 ring-amber-400",
                                 )}
-                                style={{ backgroundColor: item.listColor }}
-                                title={`${item.listName}: ${pct}%${listComplete ? " — all done!" : ""}`}
+                                style={{ backgroundColor: item.list.color }}
+                                title={`${item.list.name}: ${item.completedTasks}/${item.totalTasks} done (${pct}%)${listComplete ? " — all done!" : ""}`}
                               >
                                 {/* fill indicator */}
                                 <div
                                   className="absolute bottom-0 left-0 right-0 opacity-30 bg-black"
                                   style={{ height: `${100 - pct}%` }}
                                 />
-                                <span className="relative z-10">{item.letter}</span>
+                                <span className="relative z-10">{item.list.letter}</span>
                               </div>
                             )
                           })}
@@ -668,7 +662,6 @@ export default function Calendar() {
                             percentage: summary?.percentage ?? 0,
                           }}
                           date={selectedDate}
-                          isToday={selectedDate === today}
                         />
                       )
                     })}

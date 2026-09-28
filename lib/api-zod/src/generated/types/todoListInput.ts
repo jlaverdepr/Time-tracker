@@ -5,6 +5,7 @@
  * Work Time Tracker API
  * OpenAPI spec version: 0.1.0
  */
+import type { TodoCarryMode } from './todoCarryMode';
 
 export interface TodoListInput {
   /** @minLength 1 */
@@ -15,7 +16,7 @@ export interface TodoListInput {
      * @maxLength 1
      */
   letter: string;
-  resetDaily?: boolean;
+  carryMode?: TodoCarryMode;
   autoClearCompleted?: boolean;
   sortOrder?: number;
 }

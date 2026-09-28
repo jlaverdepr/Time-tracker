@@ -1,11 +1,10 @@
 import * as React from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
 import {
-  useGetStats, useGetRecentSessions, useListTodoLists, useListTodoTasks, useListGymWorkouts,
+  useGetStats, useGetRecentSessions, useListTodoLists, useListTodoEntries, useListGymWorkouts,
 } from '@workspace/api-client-react';
-import type { TodoTask } from '@workspace/api-client-react';
 import { useThemeColors } from '../lib/theme';
-import { formatDuration, isTaskComplete, toDateStr, todayStr } from '@workspace/shared';
+import { formatDuration, isEntryDone, toDateStr, todayStr } from '@workspace/shared';
 
 // Monday-start week bounds, matching the desktop app's startOfWeek/endOfWeek(weekStartsOn: 1).
 function weekBounds(d: Date) {
@@ -47,7 +46,7 @@ export default function DashboardScreen() {
   const { data: stats, isLoading, isError, error } = useGetStats();
   const { data: recentSessions, isLoading: isSessionsLoading } = useGetRecentSessions({ limit: 10 });
   const { data: lists = [] } = useListTodoLists();
-  const { data: allTasks = [] } = useListTodoTasks();
+  const { data: allTasks = [] } = useListTodoEntries(); // today's entries
   const { data: gymWorkouts = [] } = useListGymWorkouts();
 
   const workoutsThisWeek = React.useMemo(() => {
@@ -58,7 +57,7 @@ export default function DashboardScreen() {
   const listStats = React.useMemo(() => lists.map(list => {
     const tasks = allTasks.filter(t => t.listId === list.id);
     const total = tasks.length;
-    const done = tasks.filter(t => isTaskComplete(t, list.resetDaily)).length;
+    const done = tasks.filter(isEntryDone).length;
     const pct = total === 0 ? 0 : Math.round((done / total) * 100);
     return { list, total, done, pct };
   }), [lists, allTasks]);
@@ -122,7 +121,7 @@ export default function DashboardScreen() {
                       <Text style={styles.listBadgeText}>{list.letter}</Text>
                     </View>
                     <Text style={[styles.listCardTitle, { color: color.foreground }]}>{list.name}</Text>
-                    {list.resetDaily && (
+                    {list.carryMode === 'repeat' && (
                       <View style={[styles.dailyPill, { backgroundColor: color.muted }]}>
                         <Text style={[styles.dailyPillText, { color: color.mutedForeground }]}>daily</Text>
                       </View>

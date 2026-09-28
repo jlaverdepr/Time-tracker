@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useListTodoTasks } from "@workspace/api-client-react"
+import { useListTodoEntries } from "@workspace/api-client-react"
 
 function formatHHMM(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
@@ -12,7 +12,8 @@ function formatYMD(d: Date): string {
 // Fires a native notification for tasks with an opt-in reminderTime, while
 // the app is open. No background/tray process — matches the confirmed scope.
 export function useTaskReminders() {
-  const { data: tasks = [] } = useListTodoTasks()
+  // Today's entries (the server resolves "today" on each fetch)
+  const { data: tasks = [] } = useListTodoEntries()
   const firedRef = React.useRef<{ date: string; ids: Set<number> }>({ date: formatYMD(new Date()), ids: new Set() })
 
   React.useEffect(() => {
@@ -35,7 +36,7 @@ export function useTaskReminders() {
 
       for (const task of tasks) {
         if (!task.reminderTime || task.reminderTime !== currentTime) continue
-        if (task.completedAt) continue
+        if (task.status === "done") continue
         if (firedRef.current.ids.has(task.id)) continue
         firedRef.current.ids.add(task.id)
         new Notification("Task reminder", { body: task.text })

@@ -170,14 +170,26 @@ export interface Stats {
   allTimeSessions: number;
 }
 
+/**
+ * What happens to the list's entries when a new day starts. carry: pending entries are copied to the new day (linked to the day they came from). repeat: every entry is copied to the new day as an independent pending entry. none: nothing is copied.
+ */
+export type TodoCarryMode = typeof TodoCarryMode[keyof typeof TodoCarryMode];
+
+
+export const TodoCarryMode = {
+  carry: 'carry',
+  repeat: 'repeat',
+  none: 'none',
+} as const;
+
 export interface TodoList {
   id: number;
   name: string;
   color: string;
   /** Single uppercase character shown in badges */
   letter: string;
-  resetDaily: boolean;
-  /** If true, completed tasks are hidden (soft-cleared) once the day ends */
+  carryMode: TodoCarryMode;
+  /** If true, entries completed on earlier days no longer show in the To-Do view */
   autoClearCompleted: boolean;
   sortOrder: number;
   createdAt: string;
@@ -192,7 +204,7 @@ export interface TodoListInput {
      * @maxLength 1
      */
   letter: string;
-  resetDaily?: boolean;
+  carryMode?: TodoCarryMode;
   autoClearCompleted?: boolean;
   sortOrder?: number;
 }
@@ -206,55 +218,76 @@ export interface TodoListUpdate {
      * @maxLength 1
      */
   letter?: string;
-  resetDaily?: boolean;
+  carryMode?: TodoCarryMode;
   autoClearCompleted?: boolean;
   sortOrder?: number;
 }
 
-export interface TodoTask {
+export type TodoEntryStatus = typeof TodoEntryStatus[keyof typeof TodoEntryStatus];
+
+
+export const TodoEntryStatus = {
+  pending: 'pending',
+  done: 'done',
+} as const;
+
+/**
+ * A task as it stands on one calendar day
+ */
+export interface TodoEntry {
   id: number;
+  taskId: number;
   listId: number;
+  /** YYYY-MM-DD */
+  date: string;
+  status: TodoEntryStatus;
+  /**
+     * YYYY-MM-DD this entry was carried over from; null if it was created on this day
+     * @nullable
+     */
+  copiedFromDate?: string | null;
+  /** @nullable */
+  completedAt?: string | null;
+  text: string;
   /** @nullable */
   projectId?: number | null;
   /** @nullable */
   subprojectId?: number | null;
-  text: string;
-  /** @nullable */
-  completedAt?: string | null;
-  /**
-     * YYYY-MM-DD of completion; used for daily-reset logic
-     * @nullable
-     */
-  completedDate?: string | null;
-  /**
-     * Soft-hide timestamp; cleared tasks no longer show on the live list
-     * @nullable
-     */
-  clearedAt?: string | null;
-  /**
-     * YYYY-MM-DD; if set and in the future, task is 'prepared' and hidden until then
-     * @nullable
-     */
-  scheduledDate?: string | null;
   /**
      * HH:mm; opt-in reminder time of day
      * @nullable
      */
   reminderTime?: string | null;
   sortOrder: number;
-  createdAt: string;
 }
 
-export interface TodoTaskInput {
+export interface TodoEntryInput {
   listId: number;
   /** @minLength 1 */
   text: string;
+  /** YYYY-MM-DD; defaults to today. A past date is carried forward to today like any other pending entry. */
+  date?: string;
   projectId?: number;
   subprojectId?: number;
-  /** YYYY-MM-DD */
-  scheduledDate?: string;
   /** HH:mm */
   reminderTime?: string;
+}
+
+export interface TodoEntryUpdate {
+  status: TodoEntryStatus;
+}
+
+export interface TodoTask {
+  id: number;
+  listId: number;
+  text: string;
+  /** @nullable */
+  projectId?: number | null;
+  /** @nullable */
+  subprojectId?: number | null;
+  /** @nullable */
+  reminderTime?: string | null;
+  sortOrder: number;
 }
 
 export interface TodoTaskUpdate {
@@ -265,40 +298,21 @@ export interface TodoTaskUpdate {
   /** @nullable */
   subprojectId?: number | null;
   /** @nullable */
-  scheduledDate?: string | null;
-  /** @nullable */
   reminderTime?: string | null;
-  /** Move the task to a different list */
+  /** Move the task (today's and future entries) to a different list */
   listId?: number;
   sortOrder?: number;
 }
 
-export interface TodoCalendarSummaryItem {
+export interface TodoDaySummary {
   /** YYYY-MM-DD */
   date: string;
   listId: number;
-  listName: string;
-  listColor: string;
-  letter: string;
   totalTasks: number;
   completedTasks: number;
-  /** Count of tasks scheduled (prepared in advance) for this date */
-  preparedTasks: number;
-  /** 0-100 */
+  pendingTasks: number;
+  /** 0-100, completedTasks / totalTasks */
   percentage: number;
-}
-
-export interface TodoDayDetailTask {
-  taskId: number;
-  text: string;
-  completed: boolean;
-}
-
-export interface TodoDayDetailToggleInput {
-  taskId: number;
-  /** YYYY-MM-DD */
-  date: string;
-  completed: boolean;
 }
 
 export type GymExerciseCategory = typeof GymExerciseCategory[keyof typeof GymExerciseCategory];
@@ -520,30 +534,24 @@ export type GetRecentSessionsParams = {
 limit?: number;
 };
 
-export type ClearCompletedTodoTasks200 = {
+export type ClearCompletedTodoEntries200 = {
   clearedCount: number;
 };
 
-export type ListTodoTasksParams = {
+export type ListTodoEntriesParams = {
 /**
- * Filter by list
+ * YYYY-MM-DD; defaults to today
  */
+date?: string;
 listId?: number;
-/**
- * Filter by project
- */
 projectId?: number;
 /**
- * Include soft-cleared tasks (default false)
+ * Also return completed, not-yet-cleared entries from earlier days for lists that keep completed tasks visible (the To-Do view)
  */
-includeCleared?: boolean;
-/**
- * Include tasks scheduled for a future date (default false)
- */
-includeFuture?: boolean;
+includeEarlierDone?: boolean;
 };
 
-export type GetTodoCalendarSummaryParams = {
+export type GetTodoDaySummaryParams = {
 /**
  * YYYY-MM-DD
  */
@@ -552,14 +560,6 @@ startDate: string;
  * YYYY-MM-DD
  */
 endDate: string;
-};
-
-export type GetTodoDayDetailParams = {
-listId: number;
-/**
- * YYYY-MM-DD
- */
-date: string;
 };
 
 export type ListGymWorkoutEntriesParams = {

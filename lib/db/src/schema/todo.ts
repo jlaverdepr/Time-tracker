@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -10,14 +10,18 @@ export const todoListsTable = sqliteTable("todo_lists", {
   name: text("name").notNull(),
   color: text("color").notNull().default("#6366f1"),
   letter: text("letter").notNull(), // single uppercase char shown in badges
-  resetDaily: integer("reset_daily", { mode: "boolean" }).notNull().default(false),
   autoClearCompleted: integer("auto_clear_completed", { mode: "boolean" }).notNull().default(false),
+  // 'carry' | 'repeat' | 'none' — what the day rollover does with this list's entries
+  carryMode: text("carry_mode").notNull().default("carry"),
+  // Last date the rollover has materialized entries up to (YYYY-MM-DD)
+  lastRolledDate: text("last_rolled_date"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
 });
 
+// What a task is (text, project link, reminder, order); its per-day state lives in todoEntriesTable.
 export const todoTasksTable = sqliteTable("todo_tasks", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   listId: integer("list_id")
@@ -26,10 +30,6 @@ export const todoTasksTable = sqliteTable("todo_tasks", {
   projectId: integer("project_id").references(() => projectsTable.id, { onDelete: "set null" }),
   subprojectId: integer("subproject_id").references(() => subprojectsTable.id, { onDelete: "set null" }),
   text: text("text").notNull(),
-  completedAt: integer("completed_at", { mode: "timestamp" }),
-  completedDate: text("completed_date"), // YYYY-MM-DD; for daily-reset tracking
-  clearedAt: integer("cleared_at", { mode: "timestamp" }), // soft-hide; row is kept for history
-  scheduledDate: text("scheduled_date"), // YYYY-MM-DD; "prepared" tasks hidden until this date
   reminderTime: text("reminder_time"), // HH:mm; opt-in per-task reminder
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at", { mode: "timestamp" })
@@ -37,48 +37,43 @@ export const todoTasksTable = sqliteTable("todo_tasks", {
     .default(sql`(unixepoch())`),
 });
 
-// Authoritative "was this task done on date D" history log, independent of
-// todoTasksTable's completedAt/completedDate cache fields. Needed because a
-// recurring (resetDaily) task reuses the same row every day, so the cache
-// fields alone can't represent more than one day's completion history.
-export const todoTaskCompletionsTable = sqliteTable("todo_task_completions", {
+// One row per task per calendar day: the "day entries". A day's to-do state is
+// exactly the set of entries with that date — percentages, calendar icons and
+// history are all read from here, never reconstructed.
+export const todoEntriesTable = sqliteTable("todo_entries", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   taskId: integer("task_id")
     .notNull()
     .references(() => todoTasksTable.id, { onDelete: "cascade" }),
+  // The list the task belonged to on this day (history stays put if the task moves lists later)
+  listId: integer("list_id")
+    .notNull()
+    .references(() => todoListsTable.id, { onDelete: "cascade" }),
   date: text("date").notNull(), // YYYY-MM-DD
-  completedAt: integer("completed_at", { mode: "timestamp" })
+  status: text("status").notNull().default("pending"), // 'pending' | 'done'
+  // Set when the rollover carried this entry over from a previous day's pending entry
+  copiedFromDate: text("copied_from_date"),
+  // The entry it was carried from; deleting/completing that entry removes this copy (and its own copies)
+  copiedFromEntryId: integer("copied_from_entry_id")
+    .references((): AnySQLiteColumn => todoEntriesTable.id, { onDelete: "cascade" }),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
+  clearedAt: integer("cleared_at", { mode: "timestamp" }), // hidden from the To-Do view; still counts in history
+  createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .default(sql`(unixepoch())`),
 }, (table) => [
-  uniqueIndex("todo_task_completions_task_date_idx").on(table.taskId, table.date),
-]);
-
-// Authoritative "was this task part of the active list on date D" log. A task
-// is active on a day if it was newly created/scheduled that day, reset by a
-// resetDaily list, or carried over from the previous day because it wasn't
-// completed yet. Recomputed in full whenever a list's tasks/completions
-// change, so past days' percentages stay accurate and stable once recorded.
-export const todoActiveLogTable = sqliteTable("todo_active_log", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  taskId: integer("task_id")
-    .notNull()
-    .references(() => todoTasksTable.id, { onDelete: "cascade" }),
-  date: text("date").notNull(), // YYYY-MM-DD
-}, (table) => [
-  uniqueIndex("todo_active_log_task_date_idx").on(table.taskId, table.date),
+  uniqueIndex("todo_entries_task_date_idx").on(table.taskId, table.date),
+  index("todo_entries_date_idx").on(table.date),
+  index("todo_entries_copied_from_idx").on(table.copiedFromEntryId),
 ]);
 
 export const insertTodoListSchema = createInsertSchema(todoListsTable).omit({ id: true, createdAt: true });
 export const insertTodoTaskSchema = createInsertSchema(todoTasksTable).omit({ id: true, createdAt: true });
-export const insertTodoTaskCompletionSchema = createInsertSchema(todoTaskCompletionsTable).omit({ id: true });
-export const insertTodoActiveLogSchema = createInsertSchema(todoActiveLogTable).omit({ id: true });
+export const insertTodoEntrySchema = createInsertSchema(todoEntriesTable).omit({ id: true, createdAt: true });
 
 export type TodoList = typeof todoListsTable.$inferSelect;
 export type TodoTask = typeof todoTasksTable.$inferSelect;
-export type TodoTaskCompletion = typeof todoTaskCompletionsTable.$inferSelect;
-export type TodoActiveLog = typeof todoActiveLogTable.$inferSelect;
+export type TodoEntry = typeof todoEntriesTable.$inferSelect;
 export type InsertTodoList = z.infer<typeof insertTodoListSchema>;
 export type InsertTodoTask = z.infer<typeof insertTodoTaskSchema>;
-export type InsertTodoTaskCompletion = z.infer<typeof insertTodoTaskCompletionSchema>;
-export type InsertTodoActiveLog = z.infer<typeof insertTodoActiveLogSchema>;
+export type InsertTodoEntry = z.infer<typeof insertTodoEntrySchema>;

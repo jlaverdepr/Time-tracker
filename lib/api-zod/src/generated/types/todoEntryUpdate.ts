@@ -5,7 +5,8 @@
  * Work Time Tracker API
  * OpenAPI spec version: 0.1.0
  */
+import type { TodoEntryStatus } from './todoEntryStatus';
 
-export type ClearCompletedTodoTasks200 = {
-  clearedCount: number;
-};
+export interface TodoEntryUpdate {
+  status: TodoEntryStatus;
+}

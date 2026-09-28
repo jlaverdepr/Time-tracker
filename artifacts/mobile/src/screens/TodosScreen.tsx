@@ -1,30 +1,33 @@
 import * as React from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView,
-  ActivityIndicator, Switch, Pressable, SafeAreaView,
+  ActivityIndicator, Pressable, SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useListTodoLists, useCreateTodoList, useDeleteTodoList,
-  useListTodoTasks, useCreateTodoTask, useDeleteTodoTask,
-  useCompleteTodoTask, useUncompleteTodoTask,
-  getListTodoListsQueryKey, getListTodoTasksQueryKey,
+  useListTodoEntries, useCreateTodoEntry, useUpdateTodoEntry, useDeleteTodoEntry,
 } from '@workspace/api-client-react';
-import type { TodoList, TodoTask } from '@workspace/api-client-react';
+import type { TodoList, TodoEntry, TodoCarryMode } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../lib/theme';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { BottomSheetModal } from '../components/BottomSheetModal';
-import { TODO_LIST_COLORS, completionRate, isTaskComplete } from '@workspace/shared';
+import { TODO_LIST_COLORS, dayProgress, isEntryDone, invalidateTodoQueries, todayStr } from '@workspace/shared';
 
-function TaskRow({ task, resetDaily, color, onToggle, onDelete }: {
-  task: TodoTask
-  resetDaily: boolean
+const CARRY_MODES: { value: TodoCarryMode; label: string; short: string }[] = [
+  { value: 'carry', label: 'Carry over', short: 'carry' },
+  { value: 'repeat', label: 'Repeat daily', short: 'daily' },
+  { value: 'none', label: 'Single day', short: 'one day' },
+];
+
+function TaskRow({ task, color, onToggle, onDelete }: {
+  task: TodoEntry
   color: ThemeColors
-  onToggle: (task: TodoTask, done: boolean) => void
+  onToggle: (task: TodoEntry, done: boolean) => void
   onDelete: (id: number) => void
 }) {
-  const done = isTaskComplete(task, resetDaily);
+  const done = isEntryDone(task);
   return (
     <SwipeableRow onDelete={() => onDelete(task.id)} destructiveColor={color.destructive}>
       <View style={[styles.taskRow, { backgroundColor: color.card }]}>
@@ -52,7 +55,7 @@ function TaskRow({ task, resetDaily, color, onToggle, onDelete }: {
 
 function ListCard({ list, tasks, color, onDeleteList }: {
   list: TodoList
-  tasks: TodoTask[]
+  tasks: TodoEntry[]
   color: ThemeColors
   onDeleteList: (id: number) => void
 }) {
@@ -60,36 +63,35 @@ function ListCard({ list, tasks, color, onDeleteList }: {
   const [newTaskText, setNewTaskText] = React.useState('');
   const queryClient = useQueryClient();
 
-  const createTask = useCreateTodoTask();
-  const deleteTask = useDeleteTodoTask();
-  const completeTask = useCompleteTodoTask();
-  const uncompleteTask = useUncompleteTodoTask();
+  const createEntry = useCreateTodoEntry();
+  const deleteEntry = useDeleteTodoEntry();
+  const updateEntry = useUpdateTodoEntry();
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() });
+    invalidateTodoQueries(queryClient);
   }
 
-  function handleToggle(task: TodoTask, done: boolean) {
-    if (done) completeTask.mutate({ id: task.id }, { onSuccess: invalidate });
-    else uncompleteTask.mutate({ id: task.id }, { onSuccess: invalidate });
+  function handleToggle(task: TodoEntry, done: boolean) {
+    updateEntry.mutate({ id: task.id, data: { status: done ? 'done' : 'pending' } }, { onSuccess: invalidate });
   }
 
   function handleDeleteTask(id: number) {
-    deleteTask.mutate({ id }, { onSuccess: invalidate });
+    deleteEntry.mutate({ id }, { onSuccess: invalidate });
   }
 
   function handleAddTask() {
     const trimmed = newTaskText.trim();
     if (!trimmed) return;
-    createTask.mutate({ data: { listId: list.id, text: trimmed } }, {
+    createEntry.mutate({ data: { listId: list.id, text: trimmed } }, {
       onSuccess: () => { invalidate(); setNewTaskText(''); },
     });
   }
 
-  const pct = completionRate(tasks, list.resetDaily);
+  // Today's entries only; earlier-day completed entries are just still on display.
+  const { done: doneToday, total: totalToday, percentage: pct } = dayProgress(tasks, todayStr());
   const sorted = [...tasks].sort((a, b) => a.sortOrder - b.sortOrder);
-  const activeTasks = sorted.filter(t => !isTaskComplete(t, list.resetDaily));
-  const doneTasks = sorted.filter(t => isTaskComplete(t, list.resetDaily));
+  const activeTasks = sorted.filter(t => !isEntryDone(t));
+  const doneTasks = sorted.filter(isEntryDone);
 
   return (
     <View style={[styles.card, { backgroundColor: color.card, borderColor: color.border }]}>
@@ -100,8 +102,7 @@ function ListCard({ list, tasks, color, onDeleteList }: {
         <View style={{ flex: 1 }}>
           <Text style={[styles.cardTitle, { color: color.foreground }]}>{list.name}</Text>
           <Text style={[styles.cardSub, { color: color.mutedForeground }]}>
-            {tasks.length} task{tasks.length === 1 ? '' : 's'}
-            {list.resetDaily ? ' · daily' : ''}
+            {doneToday}/{totalToday} today · {CARRY_MODES.find(m => m.value === list.carryMode)?.short}
           </Text>
         </View>
         <Text style={[styles.pct, { color: list.color }]}>{pct}%</Text>
@@ -114,7 +115,7 @@ function ListCard({ list, tasks, color, onDeleteList }: {
             <Text style={[styles.empty, { color: color.mutedForeground }]}>No tasks yet.</Text>
           )}
           {activeTasks.map(task => (
-            <TaskRow key={task.id} task={task} resetDaily={list.resetDaily} color={color}
+            <TaskRow key={task.id} task={task} color={color}
               onToggle={handleToggle} onDelete={handleDeleteTask} />
           ))}
           {doneTasks.length > 0 && (
@@ -125,7 +126,7 @@ function ListCard({ list, tasks, color, onDeleteList }: {
                 <View style={[styles.doneDividerLine, { backgroundColor: color.border }]} />
               </View>
               {doneTasks.map(task => (
-                <TaskRow key={task.id} task={task} resetDaily={list.resetDaily} color={color}
+                <TaskRow key={task.id} task={task} color={color}
                   onToggle={handleToggle} onDelete={handleDeleteTask} />
               ))}
             </>
@@ -163,20 +164,20 @@ function AddListModal({ visible, onClose, color }: { visible: boolean; onClose: 
   const [name, setName] = React.useState('');
   const [letter, setLetter] = React.useState('A');
   const [selectedColor, setSelectedColor] = React.useState(TODO_LIST_COLORS[0]);
-  const [resetDaily, setResetDaily] = React.useState(false);
+  const [carryMode, setCarryMode] = React.useState<TodoCarryMode>('carry');
 
   function reset() {
-    setName(''); setLetter('A'); setSelectedColor(TODO_LIST_COLORS[0]); setResetDaily(false);
+    setName(''); setLetter('A'); setSelectedColor(TODO_LIST_COLORS[0]); setCarryMode('carry');
   }
 
   function handleCreate() {
     const trimmed = name.trim();
     if (!trimmed) return;
     createList.mutate({
-      data: { name: trimmed, color: selectedColor, letter: letter.toUpperCase() || 'A', resetDaily },
+      data: { name: trimmed, color: selectedColor, letter: letter.toUpperCase() || 'A', carryMode },
     }, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListTodoListsQueryKey() });
+        invalidateTodoQueries(queryClient);
         reset();
         onClose();
       },
@@ -216,9 +217,23 @@ function AddListModal({ visible, onClose, color }: { visible: boolean; onClose: 
               />
             ))}
           </View>
-          <View style={styles.switchRow}>
-            <Text style={{ color: color.foreground }}>Reset daily (recurring checklist)</Text>
-            <Switch value={resetDaily} onValueChange={setResetDaily} />
+          <Text style={{ color: color.mutedForeground, fontSize: 12 }}>When a new day starts</Text>
+          <View style={styles.colorRow}>
+            {CARRY_MODES.map(m => (
+              <TouchableOpacity
+                key={m.value}
+                onPress={() => setCarryMode(m.value)}
+                style={[
+                  styles.modeChip,
+                  { borderColor: color.border },
+                  carryMode === m.value && { backgroundColor: color.primary, borderColor: color.primary },
+                ]}
+              >
+                <Text style={{ color: carryMode === m.value ? color.primaryForeground : color.foreground, fontSize: 13, fontWeight: '600' }}>
+                  {m.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
           <View style={styles.modalButtons}>
             <TouchableOpacity onPress={() => { reset(); onClose(); }} style={styles.modalButton}>
@@ -237,12 +252,13 @@ export default function TodosScreen() {
   const color = useThemeColors();
   const queryClient = useQueryClient();
   const { data: lists = [], isLoading: listsLoading } = useListTodoLists();
-  const { data: allTasks = [] } = useListTodoTasks();
+  // Today's entries, plus earlier days' completed ones for lists that keep them visible
+  const { data: allTasks = [] } = useListTodoEntries({ includeEarlierDone: true });
   const deleteList = useDeleteTodoList();
   const [addListOpen, setAddListOpen] = React.useState(false);
 
   const tasksByList = React.useMemo(() => {
-    const map = new Map<number, TodoTask[]>();
+    const map = new Map<number, TodoEntry[]>();
     for (const t of allTasks) {
       if (!map.has(t.listId)) map.set(t.listId, []);
       map.get(t.listId)!.push(t);
@@ -252,7 +268,7 @@ export default function TodosScreen() {
 
   function handleDeleteList(id: number) {
     deleteList.mutate({ id }, {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListTodoListsQueryKey() }),
+      onSuccess: () => invalidateTodoQueries(queryClient),
     });
   }
 
@@ -322,9 +338,9 @@ const styles = StyleSheet.create({
   modalCard: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 12 },
   modalTitle: { fontSize: 18, fontWeight: '700' },
   modalInput: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14 },
+  modeChip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
   colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   colorSwatch: { width: 32, height: 32, borderRadius: 16 },
-  switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 16, marginTop: 8 },
   modalButton: { paddingHorizontal: 16, paddingVertical: 10 },
 });

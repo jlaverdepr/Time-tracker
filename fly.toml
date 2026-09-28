@@ -9,6 +9,8 @@ primary_region = "sjc"
 
 [env]
   NODE_ENV = "production"
+  # "Today" and the to-do day rollover follow this zone (your midnight, not UTC)
+  TZ = "Europe/Helsinki"
   PORT = "8080"
   DB_PATH = "/data/time-tracker.sqlite"
   MIGRATIONS_DIR = "/repo/lib/db/drizzle"

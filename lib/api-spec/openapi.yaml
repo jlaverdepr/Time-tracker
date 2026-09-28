@@ -538,7 +538,7 @@ paths:
     delete:
       operationId: deleteTodoList
       tags: [todos]
-      summary: Delete a to-do list
+      summary: Delete a to-do list and all its tasks and day entries
       parameters:
         - name: id
           in: path
@@ -553,9 +553,9 @@ paths:
 
   /todo-lists/{id}/clear-completed:
     post:
-      operationId: clearCompletedTodoTasks
+      operationId: clearCompletedTodoEntries
       tags: [todos]
-      summary: Soft-clear (hide) all currently-completed tasks in a list
+      summary: Hide the list's completed entries from the To-Do view (history and percentages are kept)
       parameters:
         - name: id
           in: path
@@ -574,64 +574,62 @@ paths:
                   clearedCount:
                     type: integer
 
-  /todo-tasks:
+  /todo-entries:
     get:
-      operationId: listTodoTasks
+      operationId: listTodoEntries
       tags: [todos]
-      summary: List tasks, optionally filtered by list
+      summary: Day entries for one date (defaults to today)
       parameters:
+        - name: date
+          in: query
+          schema:
+            type: string
+          description: "YYYY-MM-DD; defaults to today"
         - name: listId
           in: query
           schema:
             type: integer
-          description: "Filter by list"
         - name: projectId
           in: query
           schema:
             type: integer
-          description: "Filter by project"
-        - name: includeCleared
+        - name: includeEarlierDone
           in: query
           schema:
             type: boolean
-          description: "Include soft-cleared tasks (default false)"
-        - name: includeFuture
-          in: query
-          schema:
-            type: boolean
-          description: "Include tasks scheduled for a future date (default false)"
+          description: "Also return completed, not-yet-cleared entries from earlier days for lists that keep completed tasks visible (the To-Do view)"
       responses:
         "200":
-          description: List of tasks
+          description: Entries
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/TodoTask"
+                  $ref: "#/components/schemas/TodoEntry"
     post:
-      operationId: createTodoTask
+      operationId: createTodoEntry
       tags: [todos]
-      summary: Create a task
+      summary: Create a task with its entry on a date (defaults to today)
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TodoTaskInput"
+              $ref: "#/components/schemas/TodoEntryInput"
       responses:
         "201":
           description: Created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TodoTask"
+                $ref: "#/components/schemas/TodoEntry"
 
-  /todo-tasks/calendar-summary:
+  /todo-entries/summary:
     get:
-      operationId: getTodoCalendarSummary
+      operationId: getTodoDaySummary
       tags: [todos]
-      summary: Per-day completion rates for all lists in a date range
+      summary: Per-day, per-list entry counts and completion percentage for a date range
       parameters:
         - name: startDate
           in: query
@@ -647,65 +645,61 @@ paths:
           description: "YYYY-MM-DD"
       responses:
         "200":
-          description: Array of daily list summaries
+          description: One item per (date, list) that has at least one entry
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/TodoCalendarSummaryItem"
+                  $ref: "#/components/schemas/TodoDaySummary"
 
-  /todo-tasks/day-detail:
-    get:
-      operationId: getTodoDayDetail
+  /todo-entries/{id}:
+    patch:
+      operationId: updateTodoEntry
       tags: [todos]
-      summary: Reconstructed task list + completion state for a list on a specific date
+      summary: Set an entry's status. Done removes the copies made from it; pending on a past day re-copies it forward.
       parameters:
-        - name: listId
-          in: query
+        - name: id
+          in: path
           required: true
           schema:
             type: integer
-        - name: date
-          in: query
-          required: true
-          schema:
-            type: string
-          description: "YYYY-MM-DD"
-      responses:
-        "200":
-          description: Tasks as they stood on that date
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/TodoDayDetailTask"
-
-  /todo-tasks/day-detail/toggle:
-    post:
-      operationId: toggleTodoDayDetailTask
-      tags: [todos]
-      summary: Toggle a task's completion for a specific (typically past) date
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/TodoDayDetailToggleInput"
+              $ref: "#/components/schemas/TodoEntryUpdate"
       responses:
         "200":
-          description: Toggled
+          description: Updated
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/TodoDayDetailTask"
+                $ref: "#/components/schemas/TodoEntry"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTodoEntry
+      tags: [todos]
+      summary: Delete an entry and the copies made from it
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
 
   /todo-tasks/{id}:
     patch:
       operationId: updateTodoTask
       tags: [todos]
-      summary: Update a task's text
+      summary: Edit a task's details (applies to all of its entries)
       parameters:
         - name: id
           in: path
@@ -721,63 +715,6 @@ paths:
       responses:
         "200":
           description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TodoTask"
-        "404":
-          description: Not found
-    delete:
-      operationId: deleteTodoTask
-      tags: [todos]
-      summary: Delete a task
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "204":
-          description: Deleted
-        "404":
-          description: Not found
-
-  /todo-tasks/{id}/complete:
-    post:
-      operationId: completeTodoTask
-      tags: [todos]
-      summary: Mark a task as complete
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Task completed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TodoTask"
-        "404":
-          description: Not found
-
-  /todo-tasks/{id}/uncomplete:
-    post:
-      operationId: uncompleteTodoTask
-      tags: [todos]
-      summary: Mark a task as incomplete
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-      responses:
-        "200":
-          description: Task uncompleted
           content:
             application/json:
               schema:
@@ -1501,9 +1438,18 @@ components:
         allTimeSessions:
           type: integer
 
+    TodoCarryMode:
+      type: string
+      enum: [carry, repeat, none]
+      description: >-
+        What happens to the list's entries when a new day starts.
+        carry: pending entries are copied to the new day (linked to the day they came from).
+        repeat: every entry is copied to the new day as an independent pending entry.
+        none: nothing is copied.
+
     TodoList:
       type: object
-      required: [id, name, color, letter, resetDaily, autoClearCompleted, sortOrder, createdAt]
+      required: [id, name, color, letter, carryMode, autoClearCompleted, sortOrder, createdAt]
       properties:
         id:
           type: integer
@@ -1514,11 +1460,11 @@ components:
         letter:
           type: string
           description: "Single uppercase character shown in badges"
-        resetDaily:
-          type: boolean
+        carryMode:
+          $ref: "#/components/schemas/TodoCarryMode"
         autoClearCompleted:
           type: boolean
-          description: "If true, completed tasks are hidden (soft-cleared) once the day ends"
+          description: "If true, entries completed on earlier days no longer show in the To-Do view"
         sortOrder:
           type: integer
         createdAt:
@@ -1537,8 +1483,8 @@ components:
           type: string
           minLength: 1
           maxLength: 1
-        resetDaily:
-          type: boolean
+        carryMode:
+          $ref: "#/components/schemas/TodoCarryMode"
         autoClearCompleted:
           type: boolean
         sortOrder:
@@ -1556,47 +1502,51 @@ components:
           type: string
           minLength: 1
           maxLength: 1
-        resetDaily:
-          type: boolean
+        carryMode:
+          $ref: "#/components/schemas/TodoCarryMode"
         autoClearCompleted:
           type: boolean
         sortOrder:
           type: integer
 
-    TodoTask:
+    TodoEntryStatus:
+      type: string
+      enum: [pending, done]
+
+    TodoEntry:
       type: object
-      required: [id, listId, text, sortOrder, createdAt]
+      description: "A task as it stands on one calendar day"
+      required: [id, taskId, listId, date, status, text, sortOrder]
       properties:
         id:
           type: integer
+        taskId:
+          type: integer
         listId:
           type: integer
+        date:
+          type: string
+          description: "YYYY-MM-DD"
+        status:
+          $ref: "#/components/schemas/TodoEntryStatus"
+        copiedFromDate:
+          type: ["string", "null"]
+          description: "YYYY-MM-DD this entry was carried over from; null if it was created on this day"
+        completedAt:
+          type: ["string", "null"]
+        text:
+          type: string
         projectId:
           type: ["integer", "null"]
         subprojectId:
           type: ["integer", "null"]
-        text:
-          type: string
-        completedAt:
-          type: ["string", "null"]
-        completedDate:
-          type: ["string", "null"]
-          description: "YYYY-MM-DD of completion; used for daily-reset logic"
-        clearedAt:
-          type: ["string", "null"]
-          description: "Soft-hide timestamp; cleared tasks no longer show on the live list"
-        scheduledDate:
-          type: ["string", "null"]
-          description: "YYYY-MM-DD; if set and in the future, task is 'prepared' and hidden until then"
         reminderTime:
           type: ["string", "null"]
           description: "HH:mm; opt-in reminder time of day"
         sortOrder:
           type: integer
-        createdAt:
-          type: string
 
-    TodoTaskInput:
+    TodoEntryInput:
       type: object
       required: [listId, text]
       properties:
@@ -1605,16 +1555,42 @@ components:
         text:
           type: string
           minLength: 1
+        date:
+          type: string
+          description: "YYYY-MM-DD; defaults to today. A past date is carried forward to today like any other pending entry."
         projectId:
           type: integer
         subprojectId:
           type: integer
-        scheduledDate:
-          type: string
-          description: "YYYY-MM-DD"
         reminderTime:
           type: string
           description: "HH:mm"
+
+    TodoEntryUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: "#/components/schemas/TodoEntryStatus"
+
+    TodoTask:
+      type: object
+      required: [id, listId, text, sortOrder]
+      properties:
+        id:
+          type: integer
+        listId:
+          type: integer
+        text:
+          type: string
+        projectId:
+          type: ["integer", "null"]
+        subprojectId:
+          type: ["integer", "null"]
+        reminderTime:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
 
     TodoTaskUpdate:
       type: object
@@ -1626,64 +1602,32 @@ components:
           type: ["integer", "null"]
         subprojectId:
           type: ["integer", "null"]
-        scheduledDate:
-          type: ["string", "null"]
         reminderTime:
           type: ["string", "null"]
         listId:
           type: integer
-          description: "Move the task to a different list"
+          description: "Move the task (today's and future entries) to a different list"
         sortOrder:
           type: integer
 
-    TodoCalendarSummaryItem:
+    TodoDaySummary:
       type: object
-      required: [date, listId, listName, listColor, letter, totalTasks, completedTasks, preparedTasks, percentage]
+      required: [date, listId, totalTasks, completedTasks, pendingTasks, percentage]
       properties:
         date:
           type: string
           description: "YYYY-MM-DD"
         listId:
           type: integer
-        listName:
-          type: string
-        listColor:
-          type: string
-        letter:
-          type: string
         totalTasks:
           type: integer
         completedTasks:
           type: integer
-        preparedTasks:
+        pendingTasks:
           type: integer
-          description: "Count of tasks scheduled (prepared in advance) for this date"
         percentage:
           type: integer
-          description: "0-100"
-
-    TodoDayDetailTask:
-      type: object
-      required: [taskId, text, completed]
-      properties:
-        taskId:
-          type: integer
-        text:
-          type: string
-        completed:
-          type: boolean
-
-    TodoDayDetailToggleInput:
-      type: object
-      required: [taskId, date, completed]
-      properties:
-        taskId:
-          type: integer
-        date:
-          type: string
-          description: "YYYY-MM-DD"
-        completed:
-          type: boolean
+          description: "0-100, completedTasks / totalTasks"
 
     GymExerciseCategory:
       type: string

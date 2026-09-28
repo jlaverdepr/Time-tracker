@@ -453,8 +453,8 @@ export const ListTodoListsResponseItem = zod.object({
   "name": zod.string(),
   "color": zod.string(),
   "letter": zod.string().describe('Single uppercase character shown in badges'),
-  "resetDaily": zod.boolean(),
-  "autoClearCompleted": zod.boolean().describe('If true, completed tasks are hidden (soft-cleared) once the day ends'),
+  "carryMode": zod.enum(['carry', 'repeat', 'none']).describe('What happens to the list\'s entries when a new day starts. carry: pending entries are copied to the new day (linked to the day they came from). repeat: every entry is copied to the new day as an independent pending entry. none: nothing is copied.'),
+  "autoClearCompleted": zod.boolean().describe('If true, entries completed on earlier days no longer show in the To-Do view'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -473,7 +473,7 @@ export const CreateTodoListBody = zod.object({
   "name": zod.string().min(1),
   "color": zod.string(),
   "letter": zod.string().min(1).max(createTodoListBodyLetterMax),
-  "resetDaily": zod.boolean().optional(),
+  "carryMode": zod.enum(['carry', 'repeat', 'none']).optional().describe('What happens to the list\'s entries when a new day starts. carry: pending entries are copied to the new day (linked to the day they came from). repeat: every entry is copied to the new day as an independent pending entry. none: nothing is copied.'),
   "autoClearCompleted": zod.boolean().optional(),
   "sortOrder": zod.number().optional()
 })
@@ -483,8 +483,8 @@ export const CreateTodoListResponse = zod.object({
   "name": zod.string(),
   "color": zod.string(),
   "letter": zod.string().describe('Single uppercase character shown in badges'),
-  "resetDaily": zod.boolean(),
-  "autoClearCompleted": zod.boolean().describe('If true, completed tasks are hidden (soft-cleared) once the day ends'),
+  "carryMode": zod.enum(['carry', 'repeat', 'none']).describe('What happens to the list\'s entries when a new day starts. carry: pending entries are copied to the new day (linked to the day they came from). repeat: every entry is copied to the new day as an independent pending entry. none: nothing is copied.'),
+  "autoClearCompleted": zod.boolean().describe('If true, entries completed on earlier days no longer show in the To-Do view'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
@@ -506,7 +506,7 @@ export const UpdateTodoListBody = zod.object({
   "name": zod.string().min(1).optional(),
   "color": zod.string().optional(),
   "letter": zod.string().min(1).max(updateTodoListBodyLetterMax).optional(),
-  "resetDaily": zod.boolean().optional(),
+  "carryMode": zod.enum(['carry', 'repeat', 'none']).optional().describe('What happens to the list\'s entries when a new day starts. carry: pending entries are copied to the new day (linked to the day they came from). repeat: every entry is copied to the new day as an independent pending entry. none: nothing is copied.'),
   "autoClearCompleted": zod.boolean().optional(),
   "sortOrder": zod.number().optional()
 })
@@ -516,15 +516,15 @@ export const UpdateTodoListResponse = zod.object({
   "name": zod.string(),
   "color": zod.string(),
   "letter": zod.string().describe('Single uppercase character shown in badges'),
-  "resetDaily": zod.boolean(),
-  "autoClearCompleted": zod.boolean().describe('If true, completed tasks are hidden (soft-cleared) once the day ends'),
+  "carryMode": zod.enum(['carry', 'repeat', 'none']).describe('What happens to the list\'s entries when a new day starts. carry: pending entries are copied to the new day (linked to the day they came from). repeat: every entry is copied to the new day as an independent pending entry. none: nothing is copied.'),
+  "autoClearCompleted": zod.boolean().describe('If true, entries completed on earlier days no longer show in the To-Do view'),
   "sortOrder": zod.number(),
   "createdAt": zod.string()
 })
 
 
 /**
- * @summary Delete a to-do list
+ * @summary Delete a to-do list and all its tasks and day entries
  */
 export const DeleteTodoListParams = zod.object({
   "id": zod.coerce.number()
@@ -534,131 +534,133 @@ export const DeleteTodoListResponse = zod.void()
 
 
 /**
- * @summary Soft-clear (hide) all currently-completed tasks in a list
+ * @summary Hide the list's completed entries from the To-Do view (history and percentages are kept)
  */
-export const ClearCompletedTodoTasksParams = zod.object({
+export const ClearCompletedTodoEntriesParams = zod.object({
   "id": zod.coerce.number()
 })
 
-export const ClearCompletedTodoTasksResponse = zod.object({
+export const ClearCompletedTodoEntriesResponse = zod.object({
   "clearedCount": zod.number()
 })
 
 
 /**
- * @summary List tasks, optionally filtered by list
+ * @summary Day entries for one date (defaults to today)
  */
-export const ListTodoTasksQueryParams = zod.object({
-  "listId": zod.coerce.number().optional().describe('Filter by list'),
-  "projectId": zod.coerce.number().optional().describe('Filter by project'),
-  "includeCleared": zod.coerce.boolean().optional().describe('Include soft-cleared tasks (default false)'),
-  "includeFuture": zod.coerce.boolean().optional().describe('Include tasks scheduled for a future date (default false)')
+export const ListTodoEntriesQueryParams = zod.object({
+  "date": zod.coerce.string().optional().describe('YYYY-MM-DD; defaults to today'),
+  "listId": zod.coerce.number().optional(),
+  "projectId": zod.coerce.number().optional(),
+  "includeEarlierDone": zod.coerce.boolean().optional().describe('Also return completed, not-yet-cleared entries from earlier days for lists that keep completed tasks visible (the To-Do view)')
 })
 
-export const ListTodoTasksResponseItem = zod.object({
+export const ListTodoEntriesResponseItem = zod.object({
   "id": zod.number(),
+  "taskId": zod.number(),
   "listId": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "status": zod.enum(['pending', 'done']),
+  "copiedFromDate": zod.string().nullish().describe('YYYY-MM-DD this entry was carried over from; null if it was created on this day'),
+  "completedAt": zod.string().nullish(),
+  "text": zod.string(),
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
-  "text": zod.string(),
-  "completedAt": zod.string().nullish(),
-  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
-  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
-  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
   "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number(),
-  "createdAt": zod.string()
-})
-export const ListTodoTasksResponse = zod.array(ListTodoTasksResponseItem)
+  "sortOrder": zod.number()
+}).describe('A task as it stands on one calendar day')
+export const ListTodoEntriesResponse = zod.array(ListTodoEntriesResponseItem)
 
 
 /**
- * @summary Create a task
+ * @summary Create a task with its entry on a date (defaults to today)
  */
 
 
 
-export const CreateTodoTaskBody = zod.object({
+export const CreateTodoEntryBody = zod.object({
   "listId": zod.number(),
   "text": zod.string().min(1),
+  "date": zod.string().optional().describe('YYYY-MM-DD; defaults to today. A past date is carried forward to today like any other pending entry.'),
   "projectId": zod.number().optional(),
   "subprojectId": zod.number().optional(),
-  "scheduledDate": zod.string().optional().describe('YYYY-MM-DD'),
   "reminderTime": zod.string().optional().describe('HH:mm')
 })
 
-export const CreateTodoTaskResponse = zod.object({
+export const CreateTodoEntryResponse = zod.object({
   "id": zod.number(),
+  "taskId": zod.number(),
   "listId": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "status": zod.enum(['pending', 'done']),
+  "copiedFromDate": zod.string().nullish().describe('YYYY-MM-DD this entry was carried over from; null if it was created on this day'),
+  "completedAt": zod.string().nullish(),
+  "text": zod.string(),
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
-  "text": zod.string(),
-  "completedAt": zod.string().nullish(),
-  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
-  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
-  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
   "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number(),
-  "createdAt": zod.string()
-})
+  "sortOrder": zod.number()
+}).describe('A task as it stands on one calendar day')
 
 
 /**
- * @summary Per-day completion rates for all lists in a date range
+ * @summary Per-day, per-list entry counts and completion percentage for a date range
  */
-export const GetTodoCalendarSummaryQueryParams = zod.object({
+export const GetTodoDaySummaryQueryParams = zod.object({
   "startDate": zod.coerce.string().describe('YYYY-MM-DD'),
   "endDate": zod.coerce.string().describe('YYYY-MM-DD')
 })
 
-export const GetTodoCalendarSummaryResponseItem = zod.object({
+export const GetTodoDaySummaryResponseItem = zod.object({
   "date": zod.string().describe('YYYY-MM-DD'),
   "listId": zod.number(),
-  "listName": zod.string(),
-  "listColor": zod.string(),
-  "letter": zod.string(),
   "totalTasks": zod.number(),
   "completedTasks": zod.number(),
-  "preparedTasks": zod.number().describe('Count of tasks scheduled (prepared in advance) for this date'),
-  "percentage": zod.number().describe('0-100')
+  "pendingTasks": zod.number(),
+  "percentage": zod.number().describe('0-100, completedTasks \/ totalTasks')
 })
-export const GetTodoCalendarSummaryResponse = zod.array(GetTodoCalendarSummaryResponseItem)
+export const GetTodoDaySummaryResponse = zod.array(GetTodoDaySummaryResponseItem)
 
 
 /**
- * @summary Reconstructed task list + completion state for a list on a specific date
+ * @summary Set an entry's status. Done removes the copies made from it; pending on a past day re-copies it forward.
  */
-export const GetTodoDayDetailQueryParams = zod.object({
-  "listId": zod.coerce.number(),
-  "date": zod.coerce.string().describe('YYYY-MM-DD')
+export const UpdateTodoEntryParams = zod.object({
+  "id": zod.coerce.number()
 })
 
-export const GetTodoDayDetailResponseItem = zod.object({
-  "taskId": zod.number(),
-  "text": zod.string(),
-  "completed": zod.boolean()
+export const UpdateTodoEntryBody = zod.object({
+  "status": zod.enum(['pending', 'done'])
 })
-export const GetTodoDayDetailResponse = zod.array(GetTodoDayDetailResponseItem)
 
-
-/**
- * @summary Toggle a task's completion for a specific (typically past) date
- */
-export const ToggleTodoDayDetailTaskBody = zod.object({
+export const UpdateTodoEntryResponse = zod.object({
+  "id": zod.number(),
   "taskId": zod.number(),
+  "listId": zod.number(),
   "date": zod.string().describe('YYYY-MM-DD'),
-  "completed": zod.boolean()
-})
-
-export const ToggleTodoDayDetailTaskResponse = zod.object({
-  "taskId": zod.number(),
+  "status": zod.enum(['pending', 'done']),
+  "copiedFromDate": zod.string().nullish().describe('YYYY-MM-DD this entry was carried over from; null if it was created on this day'),
+  "completedAt": zod.string().nullish(),
   "text": zod.string(),
-  "completed": zod.boolean()
-})
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
+  "sortOrder": zod.number()
+}).describe('A task as it stands on one calendar day')
 
 
 /**
- * @summary Update a task's text
+ * @summary Delete an entry and the copies made from it
+ */
+export const DeleteTodoEntryParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteTodoEntryResponse = zod.void()
+
+
+/**
+ * @summary Edit a task's details (applies to all of its entries)
  */
 export const UpdateTodoTaskParams = zod.object({
   "id": zod.coerce.number()
@@ -671,81 +673,19 @@ export const UpdateTodoTaskBody = zod.object({
   "text": zod.string().min(1).optional(),
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
-  "scheduledDate": zod.string().nullish(),
   "reminderTime": zod.string().nullish(),
-  "listId": zod.number().optional().describe('Move the task to a different list'),
+  "listId": zod.number().optional().describe('Move the task (today\'s and future entries) to a different list'),
   "sortOrder": zod.number().optional()
 })
 
 export const UpdateTodoTaskResponse = zod.object({
   "id": zod.number(),
   "listId": zod.number(),
+  "text": zod.string(),
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
-  "text": zod.string(),
-  "completedAt": zod.string().nullish(),
-  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
-  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
-  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
-  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number(),
-  "createdAt": zod.string()
-})
-
-
-/**
- * @summary Delete a task
- */
-export const DeleteTodoTaskParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const DeleteTodoTaskResponse = zod.void()
-
-
-/**
- * @summary Mark a task as complete
- */
-export const CompleteTodoTaskParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const CompleteTodoTaskResponse = zod.object({
-  "id": zod.number(),
-  "listId": zod.number(),
-  "projectId": zod.number().nullish(),
-  "subprojectId": zod.number().nullish(),
-  "text": zod.string(),
-  "completedAt": zod.string().nullish(),
-  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
-  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
-  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
-  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number(),
-  "createdAt": zod.string()
-})
-
-
-/**
- * @summary Mark a task as incomplete
- */
-export const UncompleteTodoTaskParams = zod.object({
-  "id": zod.coerce.number()
-})
-
-export const UncompleteTodoTaskResponse = zod.object({
-  "id": zod.number(),
-  "listId": zod.number(),
-  "projectId": zod.number().nullish(),
-  "subprojectId": zod.number().nullish(),
-  "text": zod.string(),
-  "completedAt": zod.string().nullish(),
-  "completedDate": zod.string().nullish().describe('YYYY-MM-DD of completion; used for daily-reset logic'),
-  "clearedAt": zod.string().nullish().describe('Soft-hide timestamp; cleared tasks no longer show on the live list'),
-  "scheduledDate": zod.string().nullish().describe('YYYY-MM-DD; if set and in the future, task is \'prepared\' and hidden until then'),
-  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number(),
-  "createdAt": zod.string()
+  "reminderTime": zod.string().nullish(),
+  "sortOrder": zod.number()
 })
 
 

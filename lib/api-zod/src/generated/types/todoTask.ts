@@ -9,33 +9,12 @@
 export interface TodoTask {
   id: number;
   listId: number;
+  text: string;
   /** @nullable */
   projectId?: number | null;
   /** @nullable */
   subprojectId?: number | null;
-  text: string;
   /** @nullable */
-  completedAt?: string | null;
-  /**
-     * YYYY-MM-DD of completion; used for daily-reset logic
-     * @nullable
-     */
-  completedDate?: string | null;
-  /**
-     * Soft-hide timestamp; cleared tasks no longer show on the live list
-     * @nullable
-     */
-  clearedAt?: string | null;
-  /**
-     * YYYY-MM-DD; if set and in the future, task is 'prepared' and hidden until then
-     * @nullable
-     */
-  scheduledDate?: string | null;
-  /**
-     * HH:mm; opt-in reminder time of day
-     * @nullable
-     */
   reminderTime?: string | null;
   sortOrder: number;
-  createdAt: string;
 }

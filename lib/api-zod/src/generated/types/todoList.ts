@@ -5,6 +5,7 @@
  * Work Time Tracker API
  * OpenAPI spec version: 0.1.0
  */
+import type { TodoCarryMode } from './todoCarryMode';
 
 export interface TodoList {
   id: number;
@@ -12,8 +13,8 @@ export interface TodoList {
   color: string;
   /** Single uppercase character shown in badges */
   letter: string;
-  resetDaily: boolean;
-  /** If true, completed tasks are hidden (soft-cleared) once the day ends */
+  carryMode: TodoCarryMode;
+  /** If true, entries completed on earlier days no longer show in the To-Do view */
   autoClearCompleted: boolean;
   sortOrder: number;
   createdAt: string;

@@ -6,13 +6,12 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './clearCompletedTodoTasks200';
+export * from './clearCompletedTodoEntries200';
 export * from './daySummary';
 export * from './getCalendarParams';
 export * from './getRecentSessionsParams';
 export * from './getSubprojectCalendarEventsParams';
-export * from './getTodoCalendarSummaryParams';
-export * from './getTodoDayDetailParams';
+export * from './getTodoDaySummaryParams';
 export * from './gymBodyWeightLog';
 export * from './gymBodyWeightLogInput';
 export * from './gymBodyWeightLogUpdate';
@@ -38,7 +37,7 @@ export * from './listGymWorkoutEntriesParams';
 export * from './listGymWorkoutSetsParams';
 export * from './listSessionsParams';
 export * from './listSubprojectsParams';
-export * from './listTodoTasksParams';
+export * from './listTodoEntriesParams';
 export * from './project';
 export * from './projectInput';
 export * from './projectMinutes';
@@ -51,12 +50,14 @@ export * from './subproject';
 export * from './subprojectCalendarEvent';
 export * from './subprojectInput';
 export * from './subprojectUpdate';
-export * from './todoCalendarSummaryItem';
-export * from './todoDayDetailTask';
-export * from './todoDayDetailToggleInput';
+export * from './todoCarryMode';
+export * from './todoDaySummary';
+export * from './todoEntry';
+export * from './todoEntryInput';
+export * from './todoEntryStatus';
+export * from './todoEntryUpdate';
 export * from './todoList';
 export * from './todoListInput';
 export * from './todoListUpdate';
 export * from './todoTask';
-export * from './todoTaskInput';
 export * from './todoTaskUpdate';

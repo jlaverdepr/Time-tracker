@@ -78,6 +78,20 @@
       "when": 1790581579592,
       "tag": "0010_slimy_black_widow",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790583962179,
+      "tag": "0011_thin_namor",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790583997967,
+      "tag": "0012_zippy_blink",
+      "breakpoints": true
     }
   ]
 }

@@ -6,14 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TodoTaskInput {
+export interface TodoEntryInput {
   listId: number;
   /** @minLength 1 */
   text: string;
+  /** YYYY-MM-DD; defaults to today. A past date is carried forward to today like any other pending entry. */
+  date?: string;
   projectId?: number;
   subprojectId?: number;
-  /** YYYY-MM-DD */
-  scheduledDate?: string;
   /** HH:mm */
   reminderTime?: string;
 }

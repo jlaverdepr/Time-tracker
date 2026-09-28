@@ -6,11 +6,9 @@ import {
   useListSubprojects, useCreateSubproject, useUpdateSubproject,
   useDeleteSubproject, useCompleteSubproject, useReopenSubproject,
   getListSubprojectsQueryKey,
-  useListTodoLists, useListTodoTasks, useCreateTodoTask,
-  useCompleteTodoTask, useUncompleteTodoTask,
-  getListTodoTasksQueryKey,
+  useListTodoLists, useListTodoEntries, useCreateTodoEntry, useUpdateTodoEntry,
 } from "@workspace/api-client-react"
-import type { Subproject, TodoTask, TodoList } from "@workspace/api-client-react"
+import type { Subproject, TodoEntry } from "@workspace/api-client-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -28,7 +26,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
-import { PROJECT_COLORS } from "@workspace/shared"
+import { PROJECT_COLORS, isEntryDone, invalidateTodoQueries } from "@workspace/shared"
 
 // ── schemas ──────────────────────────────────────────────────────────────────
 
@@ -58,17 +56,9 @@ function ProgressRing({ pct, color, size = 32 }: { pct: number; color: string; s
   )
 }
 
-const TODAY = format(new Date(), "yyyy-MM-dd")
-
-function isTaskDone(task: TodoTask, resetDaily: boolean): boolean {
-  if (!task.completedAt) return false
-  if (resetDaily) return task.completedDate === TODAY
-  return true
-}
-
-function taskCompletionRate(tasks: TodoTask[], listById: Map<number, TodoList>): number | null {
+function taskCompletionRate(tasks: TodoEntry[]): number | null {
   if (tasks.length === 0) return null
-  const done = tasks.filter(t => isTaskDone(t, listById.get(t.listId)?.resetDaily ?? false)).length
+  const done = tasks.filter(isEntryDone).length
   return Math.round((done / tasks.length) * 100)
 }
 
@@ -160,18 +150,16 @@ function ProjectTaskRow({
   task,
   listName,
   listColor,
-  resetDaily,
   onComplete,
   onUncomplete,
 }: {
-  task: TodoTask
+  task: TodoEntry
   listName: string
   listColor: string
-  resetDaily: boolean
   onComplete: (id: number) => void
   onUncomplete: (id: number) => void
 }) {
-  const done = isTaskDone(task, resetDaily)
+  const done = isEntryDone(task)
   return (
     <div className={cn(
       "flex items-center gap-2.5 px-3 py-2 rounded-lg group transition-colors",
@@ -200,7 +188,8 @@ function ProjectTaskRow({
 export default function Projects() {
   const { data: projects, isLoading } = useListProjects()
   const { data: allSubprojects } = useListSubprojects()
-  const { data: allTasks = [] } = useListTodoTasks()
+  // Same entries the To-Do view shows: today's, plus earlier completed ones not yet cleared
+  const { data: allTasks = [] } = useListTodoEntries({ includeEarlierDone: true })
   const { data: lists = [] } = useListTodoLists()
 
   const createProject = useCreateProject()
@@ -213,9 +202,8 @@ export default function Projects() {
   const deleteSubproject = useDeleteSubproject()
   const completeSubproject = useCompleteSubproject()
   const reopenSubproject = useReopenSubproject()
-  const createTask = useCreateTodoTask()
-  const completeTask = useCompleteTodoTask()
-  const uncompleteTask = useUncompleteTodoTask()
+  const createTask = useCreateTodoEntry()
+  const updateEntry = useUpdateTodoEntry()
 
   const queryClient = useQueryClient()
   const { toast } = useToast()
@@ -261,7 +249,7 @@ export default function Projects() {
   }, [allSubprojects])
 
   const tasksByProject = React.useMemo(() => {
-    const map = new Map<number, TodoTask[]>()
+    const map = new Map<number, TodoEntry[]>()
     for (const t of allTasks) {
       if (t.projectId != null) {
         if (!map.has(t.projectId)) map.set(t.projectId, [])
@@ -272,7 +260,7 @@ export default function Projects() {
   }, [allTasks])
 
   const tasksBySubproject = React.useMemo(() => {
-    const map = new Map<number, TodoTask[]>()
+    const map = new Map<number, TodoEntry[]>()
     for (const t of allTasks) {
       if (t.subprojectId != null) {
         if (!map.has(t.subprojectId)) map.set(t.subprojectId, [])
@@ -287,7 +275,7 @@ export default function Projects() {
   function invalidateAll() {
     queryClient.invalidateQueries({ queryKey: getListProjectsQueryKey() })
     queryClient.invalidateQueries({ queryKey: getListSubprojectsQueryKey() })
-    queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() })
+    invalidateTodoQueries(queryClient)
   }
 
   function toggleExpand(id: number) {
@@ -400,12 +388,12 @@ export default function Projects() {
     })
   }
 
-  function handleCompleteTask(id: number) {
-    completeTask.mutate({ id }, { onSuccess: () => invalidateAll() })
+  function handleCompleteTask(entryId: number) {
+    updateEntry.mutate({ id: entryId, data: { status: "done" } }, { onSuccess: () => invalidateAll() })
   }
 
-  function handleUncompleteTask(id: number) {
-    uncompleteTask.mutate({ id }, { onSuccess: () => invalidateAll() })
+  function handleUncompleteTask(entryId: number) {
+    updateEntry.mutate({ id: entryId, data: { status: "pending" } }, { onSuccess: () => invalidateAll() })
   }
 
   const addTaskSubs = addTaskTarget
@@ -452,7 +440,7 @@ export default function Projects() {
                 ? Math.round((completedSubs.length / subs.length) * 100)
                 : null
               const projectTasks = tasksByProject.get(project.id) ?? []
-              const taskRate = taskCompletionRate(projectTasks, listById)
+              const taskRate = taskCompletionRate(projectTasks)
               // Display rate: prefer sub-based if subs exist, else task-based
               const displayRate = subRate ?? taskRate
 
@@ -527,7 +515,7 @@ export default function Projects() {
                       <div className="space-y-0.5">
                         {isExpanded && subs.map(sub => {
                           const subTasks = tasksBySubproject.get(sub.id) ?? []
-                          const subDone = subTasks.filter(t => isTaskDone(t, listById.get(t.listId)?.resetDaily ?? false)).length
+                          const subDone = subTasks.filter(t => isEntryDone(t)).length
                           return (
                             <SubprojectRow
                               key={sub.id}
@@ -575,7 +563,7 @@ export default function Projects() {
                           Tasks
                           {projectTasks.length > 0 && (
                             <span className="ml-1 text-muted-foreground">
-                              · {projectTasks.filter(t => isTaskDone(t, listById.get(t.listId)?.resetDaily ?? false)).length}/{projectTasks.length}
+                              · {projectTasks.filter(t => isEntryDone(t)).length}/{projectTasks.length}
                               {taskRate !== null && ` (${taskRate}%)`}
                             </span>
                           )}
@@ -598,7 +586,6 @@ export default function Projects() {
                                   task={task}
                                   listName={list?.name ?? "?"}
                                   listColor={list?.color ?? "#64748b"}
-                                  resetDaily={list?.resetDaily ?? false}
                                   onComplete={handleCompleteTask}
                                   onUncomplete={handleUncompleteTask}
                                 />

@@ -7,17 +7,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
 import { Ionicons } from '@expo/vector-icons';
 import {
-  useGetCalendar, useGetTodoCalendarSummary, useListGymWorkouts, useListGymRuns,
-  useListSessions, useListTodoLists, useGetTodoDayDetail, useToggleTodoDayDetailTask,
-  useCompleteTodoTask, useUncompleteTodoTask, useCreateTodoTask, useDeleteTodoTask,
+  useGetCalendar, useGetTodoDaySummary, useListGymWorkouts, useListGymRuns,
+  useListSessions, useListTodoLists, useListTodoEntries,
+  useCreateTodoEntry, useUpdateTodoEntry, useDeleteTodoEntry,
   useListGymWorkoutEntries, useListGymExercises, useListGymWorkoutSets,
-  getListTodoTasksQueryKey,
+  getListTodoEntriesQueryKey, getGetTodoDaySummaryQueryKey,
 } from '@workspace/api-client-react';
 import type { TodoList, GymWorkout } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../lib/theme';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { BottomSheetModal } from '../components/BottomSheetModal';
-import { categoryColor, formatDuration, formatPace, formatRunTime, formatSpeed, toDateStr, todayStr } from '@workspace/shared';
+import { categoryColor, formatDuration, formatPace, formatRunTime, formatSpeed, invalidateTodoQueries, toDateStr, todayStr } from '@workspace/shared';
 
 function intensityColor(minutes: number, primary: string, muted: string): string {
   if (minutes === 0) return muted;
@@ -69,53 +69,46 @@ function Legend({ color, presence }: { color: ThemeColors; presence: { workout: 
 
 // ── expandable to-do day panel ───────────────────────────────────────────
 
-function TodoDayPanel({ list, stats, date, isToday, color }: {
+function TodoDayPanel({ list, stats, date, color }: {
   list: TodoList
   stats: { totalTasks: number; completedTasks: number; percentage: number }
   date: string
-  isToday: boolean
   color: ThemeColors
 }) {
   const [expanded, setExpanded] = React.useState(false);
   const [newTaskText, setNewTaskText] = React.useState('');
   const queryClient = useQueryClient();
 
-  const { data: dayTasks, isLoading } = useGetTodoDayDetail(
-    { listId: list.id, date },
-    { query: { enabled: expanded, queryKey: ['todo-day-detail', list.id, date] } },
+  // This day's entries for this list — the same rows the percentage is computed from.
+  const { data: dayTasks, isLoading } = useListTodoEntries(
+    { date, listId: list.id },
+    { query: { enabled: expanded, queryKey: getListTodoEntriesQueryKey({ date, listId: list.id }) } },
   );
 
-  const toggleDayTask = useToggleTodoDayDetailTask();
-  const completeTask = useCompleteTodoTask();
-  const uncompleteTask = useUncompleteTodoTask();
-  const createTask = useCreateTodoTask();
-  const deleteTask = useDeleteTodoTask();
+  const updateEntry = useUpdateTodoEntry();
+  const createEntry = useCreateTodoEntry();
+  const deleteEntry = useDeleteTodoEntry();
 
   function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ['todo-day-detail', list.id, date] });
-    queryClient.invalidateQueries({ queryKey: getListTodoTasksQueryKey() });
-    queryClient.invalidateQueries({ queryKey: ['todo-calendar'] });
+    invalidateTodoQueries(queryClient);
   }
 
-  function handleToggle(taskId: number, nextCompleted: boolean) {
-    if (isToday) {
-      if (nextCompleted) completeTask.mutate({ id: taskId }, { onSuccess: invalidate });
-      else uncompleteTask.mutate({ id: taskId }, { onSuccess: invalidate });
-    } else {
-      toggleDayTask.mutate({ data: { taskId, date, completed: nextCompleted } }, { onSuccess: invalidate });
-    }
+  // Same call for any day: completing a past entry removes the copies carried
+  // from it; un-completing one carries it forward again.
+  function handleToggle(entryId: number, nextDone: boolean) {
+    updateEntry.mutate({ id: entryId, data: { status: nextDone ? 'done' : 'pending' } }, { onSuccess: invalidate });
   }
 
   function handleAddTask() {
     const trimmed = newTaskText.trim();
     if (!trimmed) return;
-    createTask.mutate({ data: { listId: list.id, text: trimmed, scheduledDate: date } }, {
+    createEntry.mutate({ data: { listId: list.id, text: trimmed, date } }, {
       onSuccess: () => { invalidate(); setNewTaskText(''); },
     });
   }
 
-  function handleDelete(taskId: number) {
-    deleteTask.mutate({ id: taskId }, { onSuccess: invalidate });
+  function handleDelete(entryId: number) {
+    deleteEntry.mutate({ id: entryId }, { onSuccess: invalidate });
   }
 
   return (
@@ -148,30 +141,36 @@ function TodoDayPanel({ list, stats, date, isToday, color }: {
           ) : !dayTasks || dayTasks.length === 0 ? (
             <Text style={[styles.panelEmpty, { color: color.mutedForeground }]}>No tasks for this day.</Text>
           ) : (
-            dayTasks.map(task => (
-              <SwipeableRow key={task.taskId} onDelete={() => handleDelete(task.taskId)} destructiveColor={color.destructive}>
+            dayTasks.map(task => {
+              const done = task.status === 'done';
+              return (
+              <SwipeableRow key={task.id} onDelete={() => handleDelete(task.id)} destructiveColor={color.destructive}>
                 <TouchableOpacity
                   style={[styles.dayTaskRow, { backgroundColor: color.card }]}
-                  onPress={() => handleToggle(task.taskId, !task.completed)}
+                  onPress={() => handleToggle(task.id, !done)}
                 >
                   <Ionicons
-                    name={task.completed ? 'checkmark-circle' : 'ellipse-outline'}
+                    name={done ? 'checkmark-circle' : 'ellipse-outline'}
                     size={16}
-                    color={task.completed ? '#10b981' : color.mutedForeground}
+                    color={done ? '#10b981' : color.mutedForeground}
                   />
                   <Text
                     style={[
                       styles.dayTaskText,
                       { color: color.foreground },
-                      task.completed && { color: color.mutedForeground, textDecorationLine: 'line-through' },
+                      done && { color: color.mutedForeground, textDecorationLine: 'line-through' },
                     ]}
                     numberOfLines={1}
                   >
                     {task.text}
                   </Text>
+                  {task.copiedFromDate && (
+                    <Text style={{ fontSize: 10, color: color.mutedForeground }}>carried</Text>
+                  )}
                 </TouchableOpacity>
               </SwipeableRow>
-            ))
+              );
+            })
           )}
 
           <View style={styles.addRow}>
@@ -263,9 +262,10 @@ function DayDetailModal({ date, onClose, color }: { date: string | null; onClose
     { query: { enabled: !!date, queryKey: ['day-sessions', displayDate] } },
   );
   const { data: todoLists = [] } = useListTodoLists();
-  const { data: todoSummary = [] } = useGetTodoCalendarSummary(
-    displayDate ? { startDate: displayDate, endDate: displayDate } : { startDate: '', endDate: '' },
-    { query: { enabled: !!date, queryKey: ['day-todo-summary', displayDate] } },
+  const daySummaryParams = { startDate: displayDate ?? '', endDate: displayDate ?? '' };
+  const { data: todoSummary = [] } = useGetTodoDaySummary(
+    daySummaryParams,
+    { query: { enabled: !!date, queryKey: getGetTodoDaySummaryQueryKey(daySummaryParams) } },
   );
   const { data: gymWorkouts = [] } = useListGymWorkouts();
   const { data: gymRuns = [] } = useListGymRuns();
@@ -331,7 +331,6 @@ function DayDetailModal({ date, onClose, color }: { date: string | null; onClose
                         percentage: summary?.percentage ?? 0,
                       }}
                       date={displayDate}
-                      isToday={isToday}
                       color={color}
                     />
                   );
@@ -429,7 +428,8 @@ export default function CalendarScreen() {
   const endDateStr = toDateStr(monthEnd);
 
   const { data: calendarData = [], isLoading } = useGetCalendar({ startDate: startDateStr, endDate: endDateStr });
-  const { data: todoSummary = [] } = useGetTodoCalendarSummary({ startDate: startDateStr, endDate: endDateStr });
+  const { data: todoSummary = [] } = useGetTodoDaySummary({ startDate: startDateStr, endDate: endDateStr });
+  const { data: todoLists = [] } = useListTodoLists();
   const { data: gymWorkouts = [] } = useListGymWorkouts();
   const { data: gymRuns = [] } = useListGymRuns();
 
@@ -439,16 +439,18 @@ export default function CalendarScreen() {
     return map;
   }, [calendarData]);
 
+  // A list's badge shows on a day exactly when it has entries (pending or done) that day.
   const todoByDate = React.useMemo(() => {
+    const listsById = new Map(todoLists.map(l => [l.id, l]));
     const map = new Map<string, { letter: string; pct: number; color: string }[]>();
     for (const item of todoSummary) {
-      if (item.totalTasks > 0) {
-        if (!map.has(item.date)) map.set(item.date, []);
-        map.get(item.date)!.push({ letter: item.letter, pct: item.percentage, color: item.listColor });
-      }
+      const list = listsById.get(item.listId);
+      if (!list) continue;
+      if (!map.has(item.date)) map.set(item.date, []);
+      map.get(item.date)!.push({ letter: list.letter, pct: item.percentage, color: list.color });
     }
     return map;
-  }, [todoSummary]);
+  }, [todoSummary, todoLists]);
 
   const gymDates = React.useMemo(() => new Set(gymWorkouts.map(w => w.date)), [gymWorkouts]);
   const runDates = React.useMemo(() => new Set(gymRuns.map(r => r.date)), [gymRuns]);

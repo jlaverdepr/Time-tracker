@@ -99,6 +99,7 @@ Distribute the built `.dmg`/`.exe` as attachments on a GitHub Release — don't 
 ## Common Commands
 
 - `pnpm run typecheck` - typecheck all packages
+- `pnpm --filter @workspace/api-server test` - run the API tests (to-do day-entry engine + migration)
 - `pnpm run build` - typecheck and build every package with a build script
 - `pnpm --filter @workspace/api-spec run codegen` - regenerate API hooks and Zod schemas after editing `lib/api-spec/openapi.yaml`
 - `pnpm --filter @workspace/db run generate` - generate Drizzle migration files after schema changes

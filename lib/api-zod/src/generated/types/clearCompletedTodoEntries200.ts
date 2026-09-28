@@ -6,8 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TodoDayDetailTask {
-  taskId: number;
-  text: string;
-  completed: boolean;
-}
+export type ClearCompletedTodoEntries200 = {
+  clearedCount: number;
+};

@@ -6,17 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface TodoCalendarSummaryItem {
+export interface TodoDaySummary {
   /** YYYY-MM-DD */
   date: string;
   listId: number;
-  listName: string;
-  listColor: string;
-  letter: string;
   totalTasks: number;
   completedTasks: number;
-  /** Count of tasks scheduled (prepared in advance) for this date */
-  preparedTasks: number;
-  /** 0-100 */
+  pendingTasks: number;
+  /** 0-100, completedTasks / totalTasks */
   percentage: number;
 }

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Layout } from "@/components/layout/layout"
-import { useListSessions, useListProjects, useDeleteSession, getListSessionsQueryKey, getGetStatsQueryKey, getGetCalendarQueryKey, getGetRecentSessionsQueryKey } from "@workspace/api-client-react"
+import { useListSessions, useListProjects, useDeleteSession } from "@workspace/api-client-react"
 import type { Session } from "@workspace/api-client-react"
 import { format } from "date-fns"
 import { Search, Filter, Trash2, Pencil } from "lucide-react"
@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
-import { EditSessionDialog } from "@/components/edit-session-dialog"
+import { SessionDialog } from "@/components/session-dialog"
+import { invalidateSessionQueries } from "@/lib/session-queries"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,14 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-
-function formatDuration(minutes: number) {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
-}
+import { formatDuration } from "@workspace/shared"
 
 export default function Sessions() {
   const [projectIdFilter, setProjectIdFilter] = React.useState<string>("all")
@@ -53,10 +47,7 @@ export default function Sessions() {
     deleteSession.mutate({ id: sessionToDelete }, {
       onSuccess: () => {
         toast({ title: "Session deleted" })
-        queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() })
-        queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() })
-        queryClient.invalidateQueries({ queryKey: getGetCalendarQueryKey() })
-        queryClient.invalidateQueries({ queryKey: getGetRecentSessionsQueryKey() })
+        invalidateSessionQueries(queryClient)
         setSessionToDelete(null)
       },
       onError: () => {
@@ -219,7 +210,7 @@ export default function Sessions() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <EditSessionDialog
+      <SessionDialog
         session={sessionToEdit}
         open={!!sessionToEdit}
         onOpenChange={(open) => !open && setSessionToEdit(null)}

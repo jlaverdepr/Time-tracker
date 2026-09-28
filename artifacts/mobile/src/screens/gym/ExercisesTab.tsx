@@ -8,8 +8,8 @@ import {
 } from '@workspace/api-client-react';
 import type { GymExercise, GymExerciseCategory as GymExerciseCategoryT } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../../lib/theme';
-import { CATEGORIES, categoryColor } from '../../lib/gym-utils';
 import { SwipeableRow } from '../../components/SwipeableRow';
+import { CATEGORIES, categoryColor } from '@workspace/shared';
 
 const CATEGORY_KEYS = Object.values(GymExerciseCategory) as GymExerciseCategoryT[];
 

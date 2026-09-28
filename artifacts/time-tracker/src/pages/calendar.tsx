@@ -21,12 +21,12 @@ import {
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { categoryColor, formatPace, formatSpeed } from "@/lib/gym-utils"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { EditSessionDialog } from "@/components/edit-session-dialog"
+import { SessionDialog } from "@/components/session-dialog"
 import { ConfettiBurst } from "@/components/confetti-burst"
 import type { Session } from "@workspace/api-client-react"
+import { categoryColor, formatDuration, formatPace, formatSpeed, todayStr } from "@workspace/shared"
 
 type CalendarIconKey = "subprojectActive" | "subprojectCompleted" | "todoBadges" | "workout" | "run" | "prepared"
 
@@ -70,16 +70,6 @@ function LegendItem({ active, onClick, children }: { active: boolean; onClick: (
     </button>
   )
 }
-
-function formatDuration(minutes: number) {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
-}
-
-function getToday() { return format(new Date(), "yyyy-MM-dd") }
 
 // ── expandable to-do list panel ─────────────────────────────────────────────────
 
@@ -285,7 +275,7 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = React.useState<string | null>(null)
   const [sessionToEdit, setSessionToEdit] = React.useState<Session | null>(null)
   const { visible: visibleIcons, toggle: toggleVisibleIcon } = useVisibleCalendarIcons()
-  const todayStr = getToday()
+  const today = todayStr()
 
   const monthStart = startOfMonth(currentMonth)
   const monthEnd = endOfMonth(currentMonth)
@@ -365,10 +355,10 @@ export default function Calendar() {
   const preparedDatesSet = React.useMemo(() => {
     const set = new Set<string>()
     for (const t of futureTasks ?? []) {
-      if (t.scheduledDate && t.scheduledDate > todayStr) set.add(t.scheduledDate)
+      if (t.scheduledDate && t.scheduledDate > today) set.add(t.scheduledDate)
     }
     return set
-  }, [futureTasks, todayStr])
+  }, [futureTasks, today])
 
   // which legend/icon types actually have a record in the visible month —
   // keeps the legend from listing activity types that never occurred here
@@ -678,7 +668,7 @@ export default function Calendar() {
                             percentage: summary?.percentage ?? 0,
                           }}
                           date={selectedDate}
-                          isToday={selectedDate === todayStr}
+                          isToday={selectedDate === today}
                         />
                       )
                     })}
@@ -835,7 +825,7 @@ export default function Calendar() {
         </SheetContent>
       </Sheet>
 
-      <EditSessionDialog
+      <SessionDialog
         session={sessionToEdit}
         open={!!sessionToEdit}
         onOpenChange={(open) => !open && setSessionToEdit(null)}

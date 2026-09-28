@@ -15,11 +15,7 @@ import {
 import type { Project, Subproject } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../lib/theme';
 import { BottomSheetModal } from '../components/BottomSheetModal';
-
-const PRESET_COLORS = [
-  '#14b8a6', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6',
-  '#d946ef', '#ec4899', '#f43f5e', '#eab308', '#f97316',
-];
+import { PROJECT_COLORS } from '@workspace/shared';
 
 function SubprojectRow({ sub, color, onToggle, onDelete }: {
   sub: Subproject
@@ -141,9 +137,9 @@ function AddProjectModal({ visible, onClose, color }: { visible: boolean; onClos
   const queryClient = useQueryClient();
   const createProject = useCreateProject();
   const [name, setName] = React.useState('');
-  const [selectedColor, setSelectedColor] = React.useState(PRESET_COLORS[0]);
+  const [selectedColor, setSelectedColor] = React.useState(PROJECT_COLORS[0]);
 
-  function reset() { setName(''); setSelectedColor(PRESET_COLORS[0]); }
+  function reset() { setName(''); setSelectedColor(PROJECT_COLORS[0]); }
 
   function handleCreate() {
     const trimmed = name.trim();
@@ -169,7 +165,7 @@ function AddProjectModal({ visible, onClose, color }: { visible: boolean; onClos
             placeholderTextColor={color.mutedForeground}
           />
           <View style={styles.colorRow}>
-            {PRESET_COLORS.map(c => (
+            {PROJECT_COLORS.map(c => (
               <Pressable
                 key={c}
                 onPress={() => setSelectedColor(c)}

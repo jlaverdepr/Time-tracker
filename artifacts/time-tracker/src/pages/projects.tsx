@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { cn } from "@/lib/utils"
 import { format, parseISO } from "date-fns"
+import { PROJECT_COLORS } from "@workspace/shared"
 
 // ── schemas ──────────────────────────────────────────────────────────────────
 
@@ -41,13 +42,6 @@ const subprojectSchema = z.object({
   name: z.string().min(1, "Name is required"),
 })
 type SubprojectFormValues = z.infer<typeof subprojectSchema>
-
-const PRESET_COLORS = [
-  "#14b8a6", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6",
-  "#d946ef", "#ec4899", "#f43f5e", "#eab308", "#f97316",
-  "#f59e0b", "#84cc16", "#22c55e", "#10b981", "#64748b",
-  "#71717a", "#78716c",
-]
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -248,7 +242,7 @@ export default function Projects() {
 
   const projectForm = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
-    defaultValues: { name: "", color: PRESET_COLORS[0] },
+    defaultValues: { name: "", color: PROJECT_COLORS[0] },
   })
 
   const subprojectForm = useForm<SubprojectFormValues>({
@@ -307,7 +301,7 @@ export default function Projects() {
   // ── project CRUD ──
   const openCreateProject = () => {
     setEditingProjectId(null)
-    projectForm.reset({ name: "", color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)] })
+    projectForm.reset({ name: "", color: PROJECT_COLORS[Math.floor(Math.random() * PROJECT_COLORS.length)] })
     setIsProjectDialogOpen(true)
   }
 
@@ -657,7 +651,7 @@ export default function Projects() {
                         <Input type="text" {...field} className="uppercase font-mono" />
                       </div>
                       <div className="flex flex-wrap gap-2 pt-2">
-                        {PRESET_COLORS.map(color => (
+                        {PROJECT_COLORS.map(color => (
                           <button key={color} type="button"
                             className={`w-6 h-6 rounded-full border-2 transition-transform hover:scale-110 ${field.value === color ? 'border-foreground shadow-md scale-110' : 'border-transparent'}`}
                             style={{ backgroundColor: color }}

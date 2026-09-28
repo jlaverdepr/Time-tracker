@@ -13,7 +13,7 @@ description: Exact steps to follow after editing openapi.yaml or lib schema file
 ## After editing `lib/db/src/schema/`
 1. Export new tables from `lib/db/src/schema/index.ts`
 2. `pnpm run typecheck:libs`
-3. `pnpm --filter @workspace/db run push`
+3. `pnpm --filter @workspace/db run generate` (commit the migration), then `pnpm run db:push` for the local dev DB
 
 ## Zod schema naming convention (orval output)
 Pattern: `{OperationId}{Segment}` where Segment is Body/Params/QueryParams/Response/ResponseItem

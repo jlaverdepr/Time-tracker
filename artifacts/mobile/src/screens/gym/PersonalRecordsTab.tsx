@@ -6,7 +6,7 @@ import {
 } from '@workspace/api-client-react';
 import type { GymExercise } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../../lib/theme';
-import { categoryColor } from '../../lib/gym-utils';
+import { categoryColor } from '@workspace/shared';
 
 type Mode = 'weight' | 'volume';
 

@@ -1,15 +1,9 @@
 import * as React from "react"
 import { format } from "date-fns"
-import {
-  useCreateSession,
-  getGetStatsQueryKey,
-  getListSessionsQueryKey,
-  getGetRecentSessionsQueryKey,
-  getGetCalendarQueryKey,
-  getGetSubprojectCalendarEventsQueryKey,
-} from "@workspace/api-client-react"
+import { useCreateSession } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
+import { invalidateSessionQueries } from "@/lib/session-queries"
 
 export type TimerStatus = "idle" | "running" | "paused"
 
@@ -152,11 +146,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       {
         onSuccess: () => {
           toast({ title: "Session logged", description: `${formatElapsed(finalElapsed)} recorded.` })
-          queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() })
-          queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() })
-          queryClient.invalidateQueries({ queryKey: getGetRecentSessionsQueryKey() })
-          queryClient.invalidateQueries({ queryKey: getGetCalendarQueryKey() })
-          queryClient.invalidateQueries({ queryKey: getGetSubprojectCalendarEventsQueryKey() })
+          invalidateSessionQueries(queryClient)
           reset()
         },
         onError: () => {

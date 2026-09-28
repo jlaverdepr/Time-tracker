@@ -1,5 +1,5 @@
 import * as React from "react"
-import { format, parseISO } from "date-fns"
+import { parseISO } from "date-fns"
 import { z } from "zod"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -22,14 +22,12 @@ import {
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  useCreateSession, useListProjects, useListSubprojects,
-  getGetStatsQueryKey, getListSessionsQueryKey,
-  getGetRecentSessionsQueryKey, getGetCalendarQueryKey,
-  getGetSubprojectCalendarEventsQueryKey,
-} from "@workspace/api-client-react"
+import { useCreateSession, useUpdateSession, useListProjects, useListSubprojects } from "@workspace/api-client-react"
+import type { Session } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
+import { todayStr } from "@workspace/shared"
+import { invalidateSessionQueries } from "@/lib/session-queries"
 
 const formSchema = z.object({
   projectId: z.string().optional().nullable(),
@@ -43,18 +41,13 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
-function invalidateSessionQueries(queryClient: ReturnType<typeof useQueryClient>) {
-  queryClient.invalidateQueries({ queryKey: getGetStatsQueryKey() })
-  queryClient.invalidateQueries({ queryKey: getListSessionsQueryKey() })
-  queryClient.invalidateQueries({ queryKey: getGetRecentSessionsQueryKey() })
-  queryClient.invalidateQueries({ queryKey: getGetCalendarQueryKey() })
-  queryClient.invalidateQueries({ queryKey: getGetSubprojectCalendarEventsQueryKey() })
-}
-
-export function LogTimeDialog({
+export function SessionDialog({
+  session,
   open,
   onOpenChange,
 }: {
+  // Pass a session to edit it; omit to log a new one.
+  session?: Session | null
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -64,13 +57,15 @@ export function LogTimeDialog({
   const { data: projects } = useListProjects()
   const { data: allSubprojects } = useListSubprojects()
   const createSession = useCreateSession()
+  const updateSession = useUpdateSession()
+  const isEdit = !!session
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       projectId: null,
       subprojectId: null,
-      date: format(new Date(), "yyyy-MM-dd"),
+      date: "",
       startTime: "",
       endTime: "",
       durationMinutes: 60,
@@ -78,20 +73,37 @@ export function LogTimeDialog({
     },
   })
 
+  // Re-seed on every open: edit mode loads the session, create mode starts
+  // from today (evaluated now, not at mount, so it's right past midnight).
+  React.useEffect(() => {
+    if (!open) return
+    form.reset(session ? {
+      projectId: session.projectId != null ? String(session.projectId) : null,
+      subprojectId: session.subprojectId != null ? String(session.subprojectId) : null,
+      date: session.date,
+      startTime: session.startTime || "",
+      endTime: session.endTime || "",
+      durationMinutes: session.durationMinutes,
+      notes: session.notes || "",
+    } : {
+      projectId: null,
+      subprojectId: null,
+      date: todayStr(),
+      startTime: "",
+      endTime: "",
+      durationMinutes: 60,
+      notes: "",
+    })
+  }, [session, open, form])
+
   const selectedProjectId = form.watch("projectId")
 
-  // Subprojects available for the selected project
   const availableSubprojects = React.useMemo(() => {
     if (!selectedProjectId || selectedProjectId === "none" || !allSubprojects) return []
     return allSubprojects.filter(s => s.projectId === Number(selectedProjectId) && s.status === "active")
   }, [selectedProjectId, allSubprojects])
 
-  // Reset subproject when project changes
-  React.useEffect(() => {
-    form.setValue("subprojectId", null)
-  }, [selectedProjectId, form])
-
-  // Auto-calc duration from start/end
+  // Auto-recalc duration whenever the user edits either time field
   const startTime = form.watch("startTime")
   const endTime = form.watch("endTime")
   React.useEffect(() => {
@@ -105,35 +117,37 @@ export function LogTimeDialog({
   }, [startTime, endTime, form])
 
   const onSubmit = (values: FormValues) => {
-    createSession.mutate({
-      data: {
-        projectId: values.projectId && values.projectId !== "none" ? Number(values.projectId) : null,
-        subprojectId: values.subprojectId && values.subprojectId !== "none" ? Number(values.subprojectId) : null,
-        date: values.date,
-        startTime: values.startTime || null,
-        endTime: values.endTime || null,
-        durationMinutes: values.durationMinutes,
-        notes: values.notes || null,
-      }
-    }, {
+    const data = {
+      projectId: values.projectId && values.projectId !== "none" ? Number(values.projectId) : null,
+      subprojectId: values.subprojectId && values.subprojectId !== "none" ? Number(values.subprojectId) : null,
+      date: values.date,
+      startTime: values.startTime || null,
+      endTime: values.endTime || null,
+      durationMinutes: values.durationMinutes,
+      notes: values.notes || null,
+    }
+    const callbacks = {
       onSuccess: () => {
-        toast({ title: "Session logged", description: "Your time has been recorded." })
+        toast(isEdit
+          ? { title: "Session updated" }
+          : { title: "Session logged", description: "Your time has been recorded." })
         invalidateSessionQueries(queryClient)
-        form.reset()
         onOpenChange(false)
       },
       onError: () => {
-        toast({ title: "Error", description: "Failed to log session.", variant: "destructive" })
-      }
-    })
+        toast({ title: "Error", description: isEdit ? "Failed to update session." : "Failed to log session.", variant: "destructive" })
+      },
+    }
+    if (session) updateSession.mutate({ id: session.id, data }, callbacks)
+    else createSession.mutate({ data }, callbacks)
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Log Time</DialogTitle>
-          <DialogDescription>Record a new work session.</DialogDescription>
+          <DialogTitle>{isEdit ? "Edit Session" : "Log Time"}</DialogTitle>
+          <DialogDescription>{isEdit ? "Adjust the time, date, or details of this session." : "Record a new work session."}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -142,7 +156,10 @@ export function LogTimeDialog({
             <FormField control={form.control} name="projectId" render={({ field }) => (
               <FormItem>
                 <FormLabel>Project</FormLabel>
-                <Select onValueChange={field.onChange} value={field.value || "none"}>
+                <Select
+                  onValueChange={v => { field.onChange(v); form.setValue("subprojectId", null) }}
+                  value={field.value || "none"}
+                >
                   <FormControl>
                     <SelectTrigger><SelectValue placeholder="Select a project" /></SelectTrigger>
                   </FormControl>
@@ -225,7 +242,7 @@ export function LogTimeDialog({
 
             <div className="flex justify-end pt-4">
               <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="mr-2">Cancel</Button>
-              <Button type="submit" disabled={createSession.isPending}>Save Session</Button>
+              <Button type="submit" disabled={createSession.isPending || updateSession.isPending}>{isEdit ? "Save Changes" : "Save Session"}</Button>
             </div>
           </form>
         </Form>

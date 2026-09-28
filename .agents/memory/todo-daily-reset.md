@@ -5,7 +5,7 @@ description: How daily reset is implemented and why TODAY must not be a module-l
 
 ## Daily reset rule
 - Tasks in a `resetDaily=true` list are visually incomplete if `task.completedDate !== today`
-- `today` must be computed at call time: `format(new Date(), "yyyy-MM-dd")` — NOT as a module-level const
+- `today` must be computed at call time: `todayStr()` from `@workspace/shared` — NOT as a module-level const
 - **Why:** A module-level `const TODAY = ...` is evaluated once at bundle load. If the app stays open past midnight, daily tasks never reset visually until hard reload.
 
 ## Calendar summary endpoint logic

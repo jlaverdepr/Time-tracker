@@ -15,21 +15,9 @@ import {
 } from '@workspace/api-client-react';
 import type { TodoList, GymWorkout } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../lib/theme';
-import { categoryColor, formatPace, formatSpeed } from '../lib/gym-utils';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { BottomSheetModal } from '../components/BottomSheetModal';
-
-function pad(n: number) { return String(n).padStart(2, '0'); }
-function toDateStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
-function todayStr() { return toDateStr(new Date()); }
-
-function formatDuration(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
+import { categoryColor, formatDuration, formatPace, formatSpeed, toDateStr, todayStr } from '@workspace/shared';
 
 function intensityColor(minutes: number, primary: string, muted: string): string {
   if (minutes === 0) return muted;

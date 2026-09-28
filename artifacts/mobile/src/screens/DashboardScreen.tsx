@@ -5,10 +5,7 @@ import {
 } from '@workspace/api-client-react';
 import type { TodoTask } from '@workspace/api-client-react';
 import { useThemeColors } from '../lib/theme';
-
-function pad(n: number) { return String(n).padStart(2, '0'); }
-function toDateStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
-function todayStr() { return toDateStr(new Date()); }
+import { formatDuration, isTaskComplete, toDateStr, todayStr } from '@workspace/shared';
 
 // Monday-start week bounds, matching the desktop app's startOfWeek/endOfWeek(weekStartsOn: 1).
 function weekBounds(d: Date) {
@@ -19,22 +16,8 @@ function weekBounds(d: Date) {
   return { start: toDateStr(start), end: toDateStr(end) };
 }
 
-function formatDuration(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m}m`;
-  if (m === 0) return `${h}h`;
-  return `${h}h ${m}m`;
-}
-
 function formatSessionDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-function isTaskCompleteToday(task: TodoTask, resetDaily: boolean): boolean {
-  if (!task.completedAt) return false;
-  if (resetDaily) return task.completedDate === todayStr();
-  return true;
 }
 
 type Color = ReturnType<typeof useThemeColors>;
@@ -75,7 +58,7 @@ export default function DashboardScreen() {
   const listStats = React.useMemo(() => lists.map(list => {
     const tasks = allTasks.filter(t => t.listId === list.id);
     const total = tasks.length;
-    const done = tasks.filter(t => isTaskCompleteToday(t, list.resetDaily)).length;
+    const done = tasks.filter(t => isTaskComplete(t, list.resetDaily)).length;
     const pct = total === 0 ? 0 : Math.round((done / total) * 100);
     return { list, total, done, pct };
   }), [lists, allTasks]);

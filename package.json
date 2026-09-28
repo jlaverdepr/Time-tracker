@@ -10,7 +10,7 @@
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "build:desktop": "pnpm --filter desktop run build",
     "typecheck:libs": "tsc --build",
-    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./desktop\" --if-present run typecheck"
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./desktop\" --filter \"./tester-app\" --if-present run typecheck"
   },
   "private": true,
   "devDependencies": {

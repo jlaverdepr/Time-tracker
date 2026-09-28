@@ -22,15 +22,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { TODO_LIST_COLORS, completionRate, isTaskComplete, todayStr } from "@workspace/shared"
 
 // ── constants ─────────────────────────────────────────────────────────────────
-
-function getToday() { return format(new Date(), "yyyy-MM-dd") }
-
-const PRESET_COLORS = [
-  "#14b8a6", "#6366f1", "#f59e0b", "#ef4444", "#8b5cf6",
-  "#ec4899", "#0ea5e9", "#22c55e", "#f97316", "#64748b",
-]
 
 const listSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -42,18 +36,6 @@ const listSchema = z.object({
 type ListFormValues = z.infer<typeof listSchema>
 
 // ── helpers ───────────────────────────────────────────────────────────────────
-
-function isTaskComplete(task: TodoTask, resetDaily: boolean): boolean {
-  if (!task.completedAt) return false
-  if (resetDaily) return task.completedDate === getToday()
-  return true
-}
-
-function completionRate(tasks: TodoTask[], resetDaily: boolean): number {
-  if (tasks.length === 0) return 0
-  const done = tasks.filter(t => isTaskComplete(t, resetDaily)).length
-  return Math.round((done / tasks.length) * 100)
-}
 
 // ── progress ring ─────────────────────────────────────────────────────────────
 
@@ -752,11 +734,11 @@ export default function Todos() {
   // ── list form ──
   const listForm = useForm<ListFormValues>({
     resolver: zodResolver(listSchema),
-    defaultValues: { name: "", color: PRESET_COLORS[0], letter: "A", resetDaily: false, autoClearCompleted: false },
+    defaultValues: { name: "", color: TODO_LIST_COLORS[0], letter: "A", resetDaily: false, autoClearCompleted: false },
   })
 
   function openAddList() {
-    listForm.reset({ name: "", color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)], letter: "A", resetDaily: false, autoClearCompleted: false })
+    listForm.reset({ name: "", color: TODO_LIST_COLORS[Math.floor(Math.random() * TODO_LIST_COLORS.length)], letter: "A", resetDaily: false, autoClearCompleted: false })
     setEditingList(null)
     setAddingList(true)
   }
@@ -1039,7 +1021,7 @@ export default function Todos() {
                     <FormLabel>Color</FormLabel>
                     <FormControl>
                       <div className="flex flex-wrap gap-1.5">
-                        {PRESET_COLORS.map(c => (
+                        {TODO_LIST_COLORS.map(c => (
                           <button key={c} type="button"
                             className={cn("w-6 h-6 rounded-full border-2 transition-transform hover:scale-110",
                               field.value === c ? "border-foreground scale-110 shadow" : "border-transparent")}

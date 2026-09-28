@@ -1,4 +1,4 @@
-import type { GymExerciseCategory } from "@workspace/api-client-react"
+import type { GymExerciseCategory } from "@workspace/api-client-react";
 
 export const CATEGORIES: { value: GymExerciseCategory; color: string }[] = [
   { value: "Upper Body", color: "#6366f1" },

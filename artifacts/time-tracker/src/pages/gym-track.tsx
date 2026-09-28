@@ -26,11 +26,9 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGr
 import { Plus, Trash2, Pencil, Check, X, Dumbbell, ListChecks, Trophy, Footprints, Save, LineChart as LineChartIcon } from "lucide-react"
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts"
 import { cn } from "@/lib/utils"
-import { CATEGORIES, categoryColor, formatPace, formatSpeed, orderCategoriesForTitle, sanitizeNumericInput } from "@/lib/gym-utils"
+import { CATEGORIES, categoryColor, formatPace, formatSpeed, orderCategoriesForTitle, sanitizeNumericInput, todayStr } from "@workspace/shared"
 
 // ── constants ─────────────────────────────────────────────────────────────────
-
-function getToday() { return format(new Date(), "yyyy-MM-dd") }
 
 // ── exercises tab ──────────────────────────────────────────────────────────────
 
@@ -1018,13 +1016,13 @@ function LogWorkoutTab() {
   }, [templates, newWorkoutEffectiveTitle])
 
   function handleBlankWorkout(title: string) {
-    createWorkout.mutate({ data: { date: getToday(), title: title || undefined } }, {
+    createWorkout.mutate({ data: { date: todayStr(), title: title || undefined } }, {
       onSuccess: () => { invalidateWorkouts(); setAddWorkoutOpen(false); toast({ title: "Workout added" }) },
     })
   }
 
   function handleWorkoutFromTemplate(template: GymWorkoutTemplate) {
-    createWorkout.mutate({ data: { date: getToday(), title: template.name } }, {
+    createWorkout.mutate({ data: { date: todayStr(), title: template.name } }, {
       onSuccess: (workout) => {
         invalidateWorkouts()
         const ids = template.exerciseIds
@@ -1274,7 +1272,7 @@ function LogWorkoutTab() {
         open={addRunOpen}
         onOpenChange={setAddRunOpen}
         title="Log a run"
-        initial={{ date: getToday(), distanceKm: null, durationMinutes: null }}
+        initial={{ date: todayStr(), distanceKm: null, durationMinutes: null }}
         onSubmit={handleAddRun}
       />
 
@@ -1387,7 +1385,7 @@ function WeightTrackerTab() {
   const updateLog = useUpdateGymBodyWeightLog()
   const deleteLog = useDeleteGymBodyWeightLog()
 
-  const [date, setDate] = React.useState(getToday())
+  const [date, setDate] = React.useState(todayStr())
   const [weightText, setWeightText] = React.useState("")
 
   function invalidate() {

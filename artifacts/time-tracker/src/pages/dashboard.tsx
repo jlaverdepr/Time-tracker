@@ -7,19 +7,7 @@ import {
 } from "@workspace/api-client-react"
 import type { TodoTask } from "@workspace/api-client-react"
 import { Clock, CalendarDays, Calendar as CalendarIcon, History, ListChecks, Dumbbell } from "lucide-react"
-
-function formatDuration(minutes: number) {
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  if (h === 0) return `${m}m`
-  return `${h}h ${m}m`
-}
-
-function isTaskCompleteToday(task: TodoTask, resetDaily: boolean): boolean {
-  if (!task.completedAt) return false
-  if (resetDaily) return task.completedDate === format(new Date(), "yyyy-MM-dd")
-  return true
-}
+import { formatDuration, isTaskComplete } from "@workspace/shared"
 
 function ProgressBar({ pct, color }: { pct: number; color: string }) {
   return (
@@ -49,7 +37,7 @@ export default function Dashboard() {
   const listStats = React.useMemo(() => lists.map(list => {
     const tasks = allTasks.filter(t => t.listId === list.id)
     const total = tasks.length
-    const done = tasks.filter(t => isTaskCompleteToday(t, list.resetDaily)).length
+    const done = tasks.filter(t => isTaskComplete(t, list.resetDaily)).length
     const pct = total === 0 ? 0 : Math.round((done / total) * 100)
     return { list, total, done, pct }
   }), [lists, allTasks])

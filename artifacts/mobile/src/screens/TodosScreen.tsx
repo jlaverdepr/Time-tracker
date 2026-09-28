@@ -15,27 +15,7 @@ import type { TodoList, TodoTask } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../lib/theme';
 import { SwipeableRow } from '../components/SwipeableRow';
 import { BottomSheetModal } from '../components/BottomSheetModal';
-
-const PRESET_COLORS = [
-  '#14b8a6', '#6366f1', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#ec4899', '#0ea5e9', '#22c55e', '#f97316', '#64748b',
-];
-
-function getToday() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function isTaskComplete(task: TodoTask, resetDaily: boolean): boolean {
-  if (!task.completedAt) return false;
-  if (resetDaily) return task.completedDate === getToday();
-  return true;
-}
-
-function completionRate(tasks: TodoTask[], resetDaily: boolean): number {
-  if (tasks.length === 0) return 0;
-  const done = tasks.filter(t => isTaskComplete(t, resetDaily)).length;
-  return Math.round((done / tasks.length) * 100);
-}
+import { TODO_LIST_COLORS, completionRate, isTaskComplete } from '@workspace/shared';
 
 function TaskRow({ task, resetDaily, color, onToggle, onDelete }: {
   task: TodoTask
@@ -182,11 +162,11 @@ function AddListModal({ visible, onClose, color }: { visible: boolean; onClose: 
   const createList = useCreateTodoList();
   const [name, setName] = React.useState('');
   const [letter, setLetter] = React.useState('A');
-  const [selectedColor, setSelectedColor] = React.useState(PRESET_COLORS[0]);
+  const [selectedColor, setSelectedColor] = React.useState(TODO_LIST_COLORS[0]);
   const [resetDaily, setResetDaily] = React.useState(false);
 
   function reset() {
-    setName(''); setLetter('A'); setSelectedColor(PRESET_COLORS[0]); setResetDaily(false);
+    setName(''); setLetter('A'); setSelectedColor(TODO_LIST_COLORS[0]); setResetDaily(false);
   }
 
   function handleCreate() {
@@ -224,7 +204,7 @@ function AddListModal({ visible, onClose, color }: { visible: boolean; onClose: 
             maxLength={1}
           />
           <View style={styles.colorRow}>
-            {PRESET_COLORS.map(c => (
+            {TODO_LIST_COLORS.map(c => (
               <Pressable
                 key={c}
                 onPress={() => setSelectedColor(c)}

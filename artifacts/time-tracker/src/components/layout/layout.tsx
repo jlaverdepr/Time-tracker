@@ -4,7 +4,7 @@ import { useTheme } from "next-themes"
 import { cn } from "@/lib/utils"
 import { LayoutDashboard, Calendar as CalendarIcon, List, FolderGit2, Plus, CheckSquare, Dumbbell, Sun, Moon } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { LogTimeDialog } from "@/components/log-time-dialog"
+import { SessionDialog } from "@/components/session-dialog"
 import { ActiveTimer } from "@/components/active-timer"
 
 function ThemeToggle() {
@@ -90,7 +90,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {children}
       </main>
 
-      <LogTimeDialog open={isLogTimeOpen} onOpenChange={setIsLogTimeOpen} />
+      <SessionDialog open={isLogTimeOpen} onOpenChange={setIsLogTimeOpen} />
     </div>
   )
 }

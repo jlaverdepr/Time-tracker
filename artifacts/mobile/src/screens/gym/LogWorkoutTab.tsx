@@ -14,17 +14,12 @@ import {
 } from '@workspace/api-client-react';
 import type { GymWorkout, GymWorkoutEntry, GymWorkoutSet, GymExercise } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../../lib/theme';
-import { categoryColor, orderCategoriesForTitle, sanitizeNumericInput } from '../../lib/gym-utils';
 import { SwipeableRow } from '../../components/SwipeableRow';
 import { BottomSheetModal } from '../../components/BottomSheetModal';
+import { categoryColor, orderCategoriesForTitle, sanitizeNumericInput, todayStr } from '@workspace/shared';
 
 const WORKOUT_TITLE_PRESETS = ['Chest', 'Legs', 'Back'] as const;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function SetChip({ set, color, onUpdate, onDelete }: {
   set: GymWorkoutSet

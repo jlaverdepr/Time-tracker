@@ -1,6 +1,6 @@
 # FocusTime
 
-Local-first time tracking and habit logging app for projects, subprojects, work sessions, to-dos, gym workouts, and runs.
+Time tracking and habit logging for projects, subprojects, work sessions, to-dos, gym workouts, runs, and body weight. One always-on server (see [DEPLOY.md](DEPLOY.md)) backs the web/desktop app and the phone app, so data logged on either shows up on both.
 
 ## Stack
 
@@ -8,19 +8,22 @@ Local-first time tracking and habit logging app for projects, subprojects, work 
 - Frontend: React 19, Vite, Tailwind CSS, Radix UI, TanStack Query, Wouter
 - API: Express 5
 - Desktop: Electron + electron-builder
+- Mobile: Expo / React Native
 - DB: local SQLite via `better-sqlite3` and Drizzle ORM
 - Validation and API contract: OpenAPI, Orval-generated React Query hooks, Zod schemas
 
 ## Repo Layout
 
-- `artifacts/time-tracker` - main React app
-- `artifacts/api-server` - Express API mounted under `/api`
-- `desktop` - Electron wrapper that starts the local API, runs migrations, and serves the built frontend
+- `artifacts/time-tracker` - main React web app
+- `artifacts/api-server` - Express API mounted under `/api`; runs migrations on boot, optionally serves the built web app (`STATIC_DIR`) and requires a bearer token when `API_AUTH_TOKEN` is set
+- `artifacts/mobile` - Expo phone app; connects to the server with a URL + token
+- `desktop` - Electron thin client: asks for the server URL + token once, then loads the web app from that server
 - `tester-app` - standalone, headless build for sharing with testers (see [Tester Build](#tester-build) below) — fully separate from `desktop`, never updated as a side effect of working on the main app
 - `lib/db` - SQLite client, Drizzle schema, and migrations
 - `lib/api-spec` - OpenAPI source and Orval config
 - `lib/api-client-react` - generated React Query API client
 - `lib/api-zod` - generated Zod request/response schemas used by the API
+- `lib/shared` - platform-neutral helpers used by both the web and mobile apps (dates, duration formatting, to-do completion, gym utils, color palettes). Put logic here instead of copying it between apps.
 
 ## Getting Started
 
@@ -31,7 +34,6 @@ pnpm install
 ```
 
 Create/update the local development database:
- ju
 ```bash
 pnpm run db:push
 ```
@@ -46,7 +48,7 @@ pnpm run dev:web
 Defaults:
 
 - API: `http://localhost:5000/api`
-- Web app: Vite's printed localhost URL, usually `http://localhost:5173`
+- Web app: `http://localhost:5173` — Vite proxies `/api` to the API (override the target with `API_URL=...`)
 - Development DB: `.local/time-tracker.sqlite`
 
 Override the local API port or database path when needed:
@@ -55,9 +57,21 @@ Override the local API port or database path when needed:
 PORT=5050 DB_PATH=.local/custom.sqlite pnpm run dev:api
 ```
 
+## Mobile App
+
+```bash
+pnpm --filter @workspace/mobile run start
+```
+
+Scan the QR code with Expo Go, then enter your server URL and access token on the connect screen.
+
+## Deployment
+
+See [DEPLOY.md](DEPLOY.md) for running the API + web app on Fly.io (`Dockerfile`, `fly.toml`).
+
 ## Desktop Build
 
-Build the packaged macOS desktop app:
+Build the packaged macOS desktop app (a thin client — it holds no data itself; point it at your deployed server on first launch, or change it later via *FocusTime → Server Settings…*):
 
 ```bash
 pnpm run build:desktop
@@ -95,4 +109,4 @@ Distribute the built `.dmg`/`.exe` as attachments on a GitHub Release — don't 
 - Keep `lib/api-spec/openapi.yaml`, generated clients, API routes, and DB schema in sync.
 - Commit Drizzle migration files from `lib/db/drizzle` when schema changes are intentional.
 - Do not commit generated build outputs, local SQLite files, `node_modules`, or `.pnpm-store`.
-- The desktop app runs migrations at startup against the user's local SQLite database.
+- The API server applies pending migrations on boot when `MIGRATIONS_DIR` is set (the Docker image and tester-app do this). For local dev, use `pnpm run db:push`.

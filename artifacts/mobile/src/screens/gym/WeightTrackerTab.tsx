@@ -8,13 +8,8 @@ import {
 } from '@workspace/api-client-react';
 import type { GymBodyWeightLog } from '@workspace/api-client-react';
 import { useThemeColors, type ThemeColors } from '../../lib/theme';
-import { sanitizeNumericInput } from '../../lib/gym-utils';
 import { SwipeableRow } from '../../components/SwipeableRow';
-
-function todayStr() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+import { sanitizeNumericInput, todayStr } from '@workspace/shared';
 
 function LogRow({ log, color, onDelete }: { log: GymBodyWeightLog; color: ThemeColors; onDelete: (id: number) => void }) {
   return (

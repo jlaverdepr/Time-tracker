@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { TodoEntryStatus } from './todoEntryStatus';
+import type { TodoEntrySubtask } from './todoEntrySubtask';
 
 /**
  * A task as it stands on one calendar day
@@ -35,4 +36,6 @@ export interface TodoEntry {
      */
   reminderTime?: string | null;
   sortOrder: number;
+  /** The task's subtasks, with whether each is ticked on this day */
+  subtasks: TodoEntrySubtask[];
 }

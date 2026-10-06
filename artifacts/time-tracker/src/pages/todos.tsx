@@ -5,15 +5,16 @@ import {
   useListTodoLists, useCreateTodoList, useUpdateTodoList, useDeleteTodoList,
   useListTodoEntries, useCreateTodoEntry, useUpdateTodoEntry, useDeleteTodoEntry,
   useUpdateTodoTask, useClearCompletedTodoEntries,
+  useCreateTodoSubtask, useUpdateTodoSubtask, useDeleteTodoSubtask, useSetTodoSubtaskDone,
   useListProjects, useListSubprojects,
 } from "@workspace/api-client-react"
-import type { TodoList, TodoEntry, TodoCarryMode, Project, Subproject } from "@workspace/api-client-react"
+import type { TodoList, TodoEntry, TodoEntrySubtask, TodoCarryMode, Project, Subproject } from "@workspace/api-client-react"
 import { useQueryClient } from "@tanstack/react-query"
 import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
-import { Plus, Trash2, CheckCircle2, Circle, ListChecks, Pencil, Check, X, Bell, BellOff, Eraser, GripVertical, PartyPopper } from "lucide-react"
+import { Plus, Trash2, CheckCircle2, Circle, ListChecks, Pencil, Check, X, Bell, BellOff, Eraser, GripVertical, PartyPopper, ListPlus } from "lucide-react"
 import { ConfettiBurst } from "@/components/confetti-burst"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
@@ -55,6 +56,92 @@ function ProgressRing({ pct, color, size = 28 }: { pct: number; color: string; s
   )
 }
 
+// ── subtasks ──────────────────────────────────────────────────────────────────
+
+// Subtask edits apply to the task on every day; ticks apply to this day's entry only.
+type SubtaskActions = {
+  onToggle: (entryId: number, subtaskId: number, done: boolean) => void
+  onAdd: (taskId: number, text: string) => void
+  onRename: (subtaskId: number, text: string) => void
+  onDelete: (subtaskId: number) => void
+}
+
+function SubtaskRow({ entryId, subtask, actions }: { entryId: number; subtask: TodoEntrySubtask; actions: SubtaskActions }) {
+  const [editing, setEditing] = React.useState(false)
+  const [value, setValue] = React.useState(subtask.text)
+
+  function submit() {
+    const trimmed = value.trim()
+    if (trimmed && trimmed !== subtask.text) actions.onRename(subtask.id, trimmed)
+    setEditing(false)
+  }
+
+  return (
+    <div className="flex items-center gap-2 min-w-0 group/sub">
+      <button
+        onClick={() => actions.onToggle(entryId, subtask.id, !subtask.done)}
+        className="shrink-0 p-0.5 -m-0.5 transition-transform hover:scale-110"
+        title={subtask.done ? "Mark not done" : "Mark done"}
+      >
+        {subtask.done
+          ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+          : <Circle className="h-3.5 w-3.5 text-muted-foreground/40 hover:text-primary/60" />}
+      </button>
+      {editing ? (
+        <input
+          autoFocus
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === "Enter") submit(); if (e.key === "Escape") setEditing(false) }}
+          onBlur={submit}
+          className="flex-1 min-w-0 bg-transparent text-xs border-b border-primary/50 focus:outline-none py-0.5"
+        />
+      ) : (
+        <span
+          className={cn("flex-1 min-w-0 truncate text-xs select-none", subtask.done && "line-through text-muted-foreground")}
+          onDoubleClick={() => { setValue(subtask.text); setEditing(true) }}
+        >
+          {subtask.text}
+        </span>
+      )}
+      {!editing && (
+        <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover/sub:opacity-100 pointer-coarse:opacity-100 transition-opacity">
+          <button onClick={() => { setValue(subtask.text); setEditing(true) }}
+            className="p-1 rounded hover:bg-muted transition-colors pointer-coarse:hidden" title="Rename subtask">
+            <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+          </button>
+          <button onClick={() => actions.onDelete(subtask.id)}
+            className="p-1 rounded hover:bg-destructive/10 transition-colors" title="Delete subtask">
+            <X className="h-2.5 w-2.5 text-muted-foreground" />
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Stays open after each add so several subtasks can be typed in a row.
+function AddSubtaskInput({ onAdd, onClose }: { onAdd: (text: string) => void; onClose: () => void }) {
+  const [value, setValue] = React.useState("")
+  return (
+    <form
+      onSubmit={e => { e.preventDefault(); if (value.trim()) { onAdd(value.trim()); setValue("") } }}
+      className="flex items-center gap-2"
+    >
+      <Plus className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+      <input
+        autoFocus
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        onKeyDown={e => { if (e.key === "Escape") onClose() }}
+        onBlur={() => { if (!value.trim()) onClose() }}
+        placeholder="Add a subtask…"
+        className="flex-1 min-w-0 bg-transparent text-xs focus:outline-none placeholder:text-muted-foreground/40 py-0.5"
+      />
+    </form>
+  )
+}
+
 // ── task item ─────────────────────────────────────────────────────────────────
 
 function TaskItem({
@@ -66,6 +153,7 @@ function TaskItem({
   onUncomplete,
   onDelete,
   onUpdate,
+  subtaskActions,
   draggable,
   onDragStart,
   onDragOverRow,
@@ -80,6 +168,7 @@ function TaskItem({
   onUncomplete: (id: number) => void
   onDelete: (id: number) => void
   onUpdate: (id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null; reminderTime?: string | null }) => void
+  subtaskActions: SubtaskActions
   draggable?: boolean
   onDragStart?: (taskId: number, listId: number) => void
   onDragOverRow?: (taskId: number, insertAfter: boolean) => void
@@ -93,6 +182,8 @@ function TaskItem({
   const [editValue, setEditValue] = React.useState(task.text)
   const [editingReminder, setEditingReminder] = React.useState(false)
   const [reminderValue, setReminderValue] = React.useState(task.reminderTime ?? "")
+  const [addingSubtask, setAddingSubtask] = React.useState(false)
+  const subtasksDone = task.subtasks.filter(s => s.done).length
   const editRef = React.useRef<HTMLInputElement>(null)
   const rowRef = React.useRef<HTMLDivElement>(null)
 
@@ -210,6 +301,15 @@ function TaskItem({
           <span className="text-[10px] text-muted-foreground shrink-0" title={`Completed on ${task.date}`}>{earlierDay}</span>
         )}
 
+        {!editing && task.subtasks.length > 0 && (
+          <span
+            className={cn("text-[10px] font-mono shrink-0", subtasksDone === task.subtasks.length ? "text-emerald-600" : "text-muted-foreground")}
+            title="Subtasks done"
+          >
+            {subtasksDone}/{task.subtasks.length}
+          </span>
+        )}
+
         {!editing && task.reminderTime && (
           <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground shrink-0" title="Reminder time">
             <Bell className="h-2.5 w-2.5" />
@@ -219,6 +319,10 @@ function TaskItem({
 
         {!editing && !done && (
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 pointer-coarse:opacity-100 transition-opacity shrink-0">
+            <button onClick={() => setAddingSubtask(true)}
+              className="p-1 rounded hover:bg-muted transition-colors" title="Add subtask">
+              <ListPlus className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
             <button onClick={() => { setReminderValue(task.reminderTime ?? ""); setEditingReminder(v => !v) }}
               className="p-1 rounded hover:bg-muted transition-colors" title="Set reminder">
               {task.reminderTime
@@ -244,6 +348,21 @@ function TaskItem({
           </div>
         )}
       </div>
+
+      {/* subtasks — hidden once the task is done; the n/m count stays */}
+      {!done && (task.subtasks.length > 0 || addingSubtask) && (
+        <div className="flex flex-col gap-1 ml-6 pl-0.5">
+          {task.subtasks.map(s => (
+            <SubtaskRow key={s.id} entryId={task.id} subtask={s} actions={subtaskActions} />
+          ))}
+          {addingSubtask && (
+            <AddSubtaskInput
+              onAdd={text => subtaskActions.onAdd(task.taskId, text)}
+              onClose={() => setAddingSubtask(false)}
+            />
+          )}
+        </div>
+      )}
 
       {editingReminder && (
         <div className="flex items-center gap-1.5 ml-6">
@@ -382,6 +501,7 @@ function ListCard({
   onUncomplete,
   onDelete,
   onUpdate,
+  subtaskActions,
   onEditList,
   onDeleteList,
   onClearCompleted,
@@ -410,6 +530,7 @@ function ListCard({
   onUncomplete: (id: number) => void
   onDelete: (id: number) => void
   onUpdate: (id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null; reminderTime?: string | null }) => void
+  subtaskActions: SubtaskActions
   onEditList: (list: TodoList) => void
   onDeleteList: (id: number) => void
   onClearCompleted: (listId: number) => void
@@ -626,6 +747,7 @@ function ListCard({
                   projects={projects} subprojectsByProject={subprojectsByProject}
                   onComplete={onComplete} onUncomplete={onUncomplete}
                   onDelete={onDelete} onUpdate={onUpdate}
+                  subtaskActions={subtaskActions}
                   draggable
                   onDragStart={onTaskDragStart}
                   onDragOverRow={onTaskDragOverRow}
@@ -652,7 +774,8 @@ function ListCard({
                   <TaskItem key={task.id} task={task} listId={list.id}
                     projects={projects} subprojectsByProject={subprojectsByProject}
                     onComplete={onComplete} onUncomplete={onUncomplete}
-                    onDelete={onDelete} onUpdate={onUpdate} />
+                    onDelete={onDelete} onUpdate={onUpdate}
+                    subtaskActions={subtaskActions} />
                 ))}
               </>
             )}
@@ -685,6 +808,10 @@ export default function Todos() {
   const deleteEntry = useDeleteTodoEntry()
   const updateTask = useUpdateTodoTask()
   const clearCompleted = useClearCompletedTodoEntries()
+  const createSubtask = useCreateTodoSubtask()
+  const updateSubtask = useUpdateTodoSubtask()
+  const deleteSubtask = useDeleteTodoSubtask()
+  const setSubtaskDone = useSetTodoSubtaskDone()
 
   const [addingList, setAddingList] = React.useState(false)
   const [editingList, setEditingList] = React.useState<TodoList | null>(null)
@@ -798,6 +925,17 @@ export default function Todos() {
   // Task ids: text/project/reminder edits apply to the task on every day.
   function handleUpdateTask(id: number, data: { text?: string; projectId?: number | null; subprojectId?: number | null; reminderTime?: string | null }) {
     updateTask.mutate({ id, data }, { onSuccess: () => invalidate() })
+  }
+
+  const subtaskActions: SubtaskActions = {
+    onToggle: (entryId, subtaskId, done) =>
+      setSubtaskDone.mutate({ id: entryId, subtaskId, data: { done } }, { onSuccess: () => invalidate() }),
+    onAdd: (taskId, text) =>
+      createSubtask.mutate({ id: taskId, data: { text } }, { onSuccess: () => invalidate() }),
+    onRename: (subtaskId, text) =>
+      updateSubtask.mutate({ id: subtaskId, data: { text } }, { onSuccess: () => invalidate() }),
+    onDelete: (subtaskId) =>
+      deleteSubtask.mutate({ id: subtaskId }, { onSuccess: () => invalidate() }),
   }
 
   function handleClearCompleted(listId: number) {
@@ -959,6 +1097,7 @@ export default function Todos() {
                 onUncomplete={handleUncomplete}
                 onDelete={handleDeleteTask}
                 onUpdate={handleUpdateTask}
+                subtaskActions={subtaskActions}
                 onEditList={openEditList}
                 onDeleteList={setDeleteListId}
                 onClearCompleted={handleClearCompleted}

@@ -13,12 +13,16 @@
 //   (and, via ON DELETE CASCADE on copied_from_entry_id, their copies).
 //   Marking a past entry pending again re-copies it forward to today.
 // - Deleting an entry deletes the copies made from it the same way.
+// - Subtasks belong to the task; which are ticked belongs to each entry.
+//   A carried copy starts with its source's ticks; a repeat copy with none.
 //
 // All multi-step mutations run inside one synchronous better-sqlite3
 // transaction, so concurrent requests can't interleave mid-update.
 import { db } from "@workspace/db";
-import { todoListsTable, todoTasksTable, todoEntriesTable } from "@workspace/db/schema";
-import type { TodoEntry, TodoList, TodoTask } from "@workspace/db/schema";
+import {
+  todoListsTable, todoTasksTable, todoEntriesTable, todoSubtasksTable, todoSubtaskChecksTable,
+} from "@workspace/db/schema";
+import type { TodoEntry, TodoList, TodoTask, TodoSubtask } from "@workspace/db/schema";
 import { and, asc, count, eq, gte, inArray, isNull, lt, lte, ne, sql } from "drizzle-orm";
 import { format } from "date-fns";
 
@@ -41,6 +45,17 @@ function addDays(date: string, n: number): string {
 
 // ─── rollover ──────────────────────────────────────────────────────────────────
 
+// A carried copy keeps the subtasks already ticked on the entry it came from.
+function copyChecks(tx: Tx, fromEntryId: number, toEntryId: number): void {
+  const checks = tx.select().from(todoSubtaskChecksTable)
+    .where(eq(todoSubtaskChecksTable.entryId, fromEntryId)).all();
+  for (const c of checks) {
+    tx.insert(todoSubtaskChecksTable)
+      .values({ subtaskId: c.subtaskId, entryId: toEntryId, completedAt: c.completedAt })
+      .onConflictDoNothing().run();
+  }
+}
+
 function rollOverList(tx: Tx, list: TodoList, today: string): void {
   if (list.lastRolledDate != null && list.lastRolledDate >= today) return;
 
@@ -52,11 +67,12 @@ function rollOverList(tx: Tx, list: TodoList, today: string): void {
         .all();
       for (const e of prevEntries) {
         if (list.carryMode === "carry" && e.status !== "pending") continue;
-        tx.insert(todoEntriesTable).values(
+        const copy = tx.insert(todoEntriesTable).values(
           list.carryMode === "carry"
             ? { taskId: e.taskId, listId: list.id, date, status: "pending", copiedFromDate: prevDate, copiedFromEntryId: e.id }
             : { taskId: e.taskId, listId: list.id, date, status: "pending" },
-        ).onConflictDoNothing().run();
+        ).onConflictDoNothing().returning().get();
+        if (copy && list.carryMode === "carry") copyChecks(tx, e.id, copy.id);
       }
     }
   }
@@ -87,10 +103,12 @@ function carryForward(tx: Tx, from: TodoEntry, today: string): void {
     const existing = tx.select({ id: todoEntriesTable.id }).from(todoEntriesTable)
       .where(and(eq(todoEntriesTable.taskId, from.taskId), eq(todoEntriesTable.date, date))).get();
     if (existing) return;
-    prev = tx.insert(todoEntriesTable).values({
+    const copy = tx.insert(todoEntriesTable).values({
       taskId: from.taskId, listId: from.listId, date, status: "pending",
       copiedFromDate: prev.date, copiedFromEntryId: prev.id,
     }).returning().get();
+    copyChecks(tx, prev.id, copy.id);
+    prev = copy;
   }
 }
 
@@ -105,9 +123,10 @@ function repeatForward(tx: Tx, from: TodoEntry, today: string): void {
 
 // ─── reads ─────────────────────────────────────────────────────────────────────
 
-export type EntryWithTask = { entry: TodoEntry; task: TodoTask };
+type EntryRow = { entry: TodoEntry; task: TodoTask };
+export type EntryWithTask = EntryRow & { subtasks: (TodoSubtask & { done: boolean })[] };
 
-export function serializeEntry({ entry, task }: EntryWithTask) {
+export function serializeEntry({ entry, task, subtasks }: EntryWithTask) {
   return {
     id: entry.id,
     taskId: entry.taskId,
@@ -121,7 +140,26 @@ export function serializeEntry({ entry, task }: EntryWithTask) {
     subprojectId: task.subprojectId ?? null,
     reminderTime: task.reminderTime ?? null,
     sortOrder: task.sortOrder,
+    subtasks: subtasks.map(s => ({ id: s.id, text: s.text, sortOrder: s.sortOrder, done: s.done })),
   };
+}
+
+// Adds each entry's subtasks (from its task) and which are ticked on its day.
+function withSubtasks(tx: Tx | typeof db, rows: EntryRow[]): EntryWithTask[] {
+  if (rows.length === 0) return [];
+  const taskIds = [...new Set(rows.map(r => r.task.id))];
+  const subtasks = tx.select().from(todoSubtasksTable)
+    .where(inArray(todoSubtasksTable.taskId, taskIds))
+    .orderBy(asc(todoSubtasksTable.sortOrder), asc(todoSubtasksTable.id)).all();
+  if (subtasks.length === 0) return rows.map(r => ({ ...r, subtasks: [] }));
+  const checks = tx.select().from(todoSubtaskChecksTable)
+    .where(inArray(todoSubtaskChecksTable.entryId, rows.map(r => r.entry.id))).all();
+  const ticked = new Set(checks.map(c => `${c.entryId}:${c.subtaskId}`));
+  return rows.map(r => ({
+    ...r,
+    subtasks: subtasks.filter(s => s.taskId === r.task.id)
+      .map(s => ({ ...s, done: ticked.has(`${r.entry.id}:${s.id}`) })),
+  }));
 }
 
 function selectEntries(tx: Tx | typeof db) {
@@ -131,7 +169,8 @@ function selectEntries(tx: Tx | typeof db) {
 }
 
 function getEntry(tx: Tx | typeof db, id: number): EntryWithTask | undefined {
-  return selectEntries(tx).where(eq(todoEntriesTable.id, id)).get();
+  const row = selectEntries(tx).where(eq(todoEntriesTable.id, id)).get();
+  return row && withSubtasks(tx, [row])[0];
 }
 
 export function listEntries(opts: {
@@ -145,7 +184,7 @@ export function listEntries(opts: {
   const order = [asc(todoTasksTable.sortOrder), asc(todoTasksTable.createdAt)];
 
   const rows = selectEntries(db).where(and(eq(todoEntriesTable.date, date), ...filters)).orderBy(...order).all();
-  if (!opts.includeEarlierDone) return rows;
+  if (!opts.includeEarlierDone) return withSubtasks(db, rows);
 
   // The To-Do view also keeps showing earlier days' completed entries until
   // they're cleared, for lists that don't auto-clear. Repeat lists are
@@ -153,7 +192,7 @@ export function listEntries(opts: {
   const keepDoneLists = db.select({ id: todoListsTable.id }).from(todoListsTable)
     .where(and(eq(todoListsTable.autoClearCompleted, false), ne(todoListsTable.carryMode, "repeat")))
     .all().map(l => l.id);
-  if (keepDoneLists.length === 0) return rows;
+  if (keepDoneLists.length === 0) return withSubtasks(db, rows);
   const earlierDone = selectEntries(db).where(and(
     lt(todoEntriesTable.date, date),
     eq(todoEntriesTable.status, "done"),
@@ -161,7 +200,7 @@ export function listEntries(opts: {
     inArray(todoEntriesTable.listId, keepDoneLists),
     ...filters,
   )).orderBy(...order).all();
-  return [...rows, ...earlierDone];
+  return withSubtasks(db, [...rows, ...earlierDone]);
 }
 
 export function daySummary(startDate: string, endDate: string) {
@@ -211,7 +250,7 @@ export function createEntry(input: {
       if (list.carryMode === "carry") carryForward(tx, entry, today);
       else if (list.carryMode === "repeat") repeatForward(tx, entry, today);
     }
-    return { entry, task };
+    return { entry, task, subtasks: [] };
   });
 }
 
@@ -276,4 +315,44 @@ export function clearCompleted(listId: number): number {
       lte(todoEntriesTable.date, todayStr()),
     ))
     .returning({ id: todoEntriesTable.id }).all().length;
+}
+
+// ─── subtasks ──────────────────────────────────────────────────────────────────
+
+export function createSubtask(taskId: number, input: { text: string; sortOrder?: number }): TodoSubtask | null {
+  return db.transaction(tx => {
+    const task = tx.select({ id: todoTasksTable.id }).from(todoTasksTable).where(eq(todoTasksTable.id, taskId)).get();
+    if (!task) return null;
+    // New subtasks go to the bottom unless placed explicitly.
+    const last = tx.select({ max: sql<number | null>`max(${todoSubtasksTable.sortOrder})` })
+      .from(todoSubtasksTable).where(eq(todoSubtasksTable.taskId, taskId)).get();
+    return tx.insert(todoSubtasksTable).values({
+      taskId, text: input.text, sortOrder: input.sortOrder ?? (last?.max ?? -1) + 1,
+    }).returning().get();
+  });
+}
+
+export function updateSubtask(id: number, updates: { text?: string; sortOrder?: number }): TodoSubtask | null {
+  return db.update(todoSubtasksTable).set(updates).where(eq(todoSubtasksTable.id, id)).returning().get() ?? null;
+}
+
+export function deleteSubtask(id: number): boolean {
+  return db.delete(todoSubtasksTable).where(eq(todoSubtasksTable.id, id)).returning().get() != null;
+}
+
+// Ticks/unticks a subtask on one day's entry only; other days keep their own ticks.
+export function setSubtaskDone(entryId: number, subtaskId: number, done: boolean): EntryWithTask | null {
+  return db.transaction(tx => {
+    const entry = tx.select().from(todoEntriesTable).where(eq(todoEntriesTable.id, entryId)).get();
+    const subtask = tx.select().from(todoSubtasksTable).where(eq(todoSubtasksTable.id, subtaskId)).get();
+    if (!entry || !subtask || subtask.taskId !== entry.taskId) return null;
+    if (done) {
+      tx.insert(todoSubtaskChecksTable).values({ subtaskId, entryId }).onConflictDoNothing().run();
+    } else {
+      tx.delete(todoSubtaskChecksTable).where(and(
+        eq(todoSubtaskChecksTable.subtaskId, subtaskId), eq(todoSubtaskChecksTable.entryId, entryId),
+      )).run();
+    }
+    return getEntry(tx, entryId) ?? null;
+  });
 }

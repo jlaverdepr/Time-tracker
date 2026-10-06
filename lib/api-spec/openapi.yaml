@@ -722,6 +722,107 @@ paths:
         "404":
           description: Not found
 
+  /todo-tasks/{id}/subtasks:
+    post:
+      operationId: createTodoSubtask
+      tags: [todos]
+      summary: Add a subtask to a task (it shows on every day the task is on)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoSubtaskInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoSubtask"
+        "404":
+          description: Task not found
+
+  /todo-subtasks/{id}:
+    patch:
+      operationId: updateTodoSubtask
+      tags: [todos]
+      summary: Rename or reorder a subtask
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoSubtaskUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoSubtask"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTodoSubtask
+      tags: [todos]
+      summary: Delete a subtask from its task (on every day)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /todo-entries/{id}/subtasks/{subtaskId}:
+    put:
+      operationId: setTodoSubtaskDone
+      tags: [todos]
+      summary: Tick or untick a subtask on one day's entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: subtaskId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TodoSubtaskCheck"
+      responses:
+        "200":
+          description: The entry with its subtasks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TodoEntry"
+        "404":
+          description: Entry or subtask not found
+
   /gym-exercises:
     get:
       operationId: listGymExercises
@@ -1516,7 +1617,7 @@ components:
     TodoEntry:
       type: object
       description: "A task as it stands on one calendar day"
-      required: [id, taskId, listId, date, status, text, sortOrder]
+      required: [id, taskId, listId, date, status, text, sortOrder, subtasks]
       properties:
         id:
           type: integer
@@ -1545,6 +1646,63 @@ components:
           description: "HH:mm; opt-in reminder time of day"
         sortOrder:
           type: integer
+        subtasks:
+          type: array
+          description: "The task's subtasks, with whether each is ticked on this day"
+          items:
+            $ref: "#/components/schemas/TodoEntrySubtask"
+
+    TodoEntrySubtask:
+      type: object
+      required: [id, text, sortOrder, done]
+      properties:
+        id:
+          type: integer
+        text:
+          type: string
+        sortOrder:
+          type: integer
+        done:
+          type: boolean
+
+    TodoSubtask:
+      type: object
+      required: [id, taskId, text, sortOrder]
+      properties:
+        id:
+          type: integer
+        taskId:
+          type: integer
+        text:
+          type: string
+        sortOrder:
+          type: integer
+
+    TodoSubtaskInput:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+        sortOrder:
+          type: integer
+
+    TodoSubtaskUpdate:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+        sortOrder:
+          type: integer
+
+    TodoSubtaskCheck:
+      type: object
+      required: [done]
+      properties:
+        done:
+          type: boolean
 
     TodoEntryInput:
       type: object

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, uniqueIndex, index, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex, index, primaryKey, type AnySQLiteColumn } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
@@ -67,6 +67,39 @@ export const todoEntriesTable = sqliteTable("todo_entries", {
   index("todo_entries_copied_from_idx").on(table.copiedFromEntryId),
 ]);
 
+// A checklist inside a task. What the subtasks are belongs to the task; which
+// ones are ticked belongs to each day's entry (todoSubtaskChecksTable).
+export const todoSubtasksTable = sqliteTable("todo_subtasks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  taskId: integer("task_id")
+    .notNull()
+    .references(() => todoTasksTable.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+}, (table) => [
+  index("todo_subtasks_task_idx").on(table.taskId),
+]);
+
+// A subtask ticked on one day's entry. Carried entries copy their source's
+// ticks; repeat-list entries start with none.
+export const todoSubtaskChecksTable = sqliteTable("todo_subtask_checks", {
+  subtaskId: integer("subtask_id")
+    .notNull()
+    .references(() => todoSubtasksTable.id, { onDelete: "cascade" }),
+  entryId: integer("entry_id")
+    .notNull()
+    .references(() => todoEntriesTable.id, { onDelete: "cascade" }),
+  completedAt: integer("completed_at", { mode: "timestamp" })
+    .notNull()
+    .default(sql`(unixepoch())`),
+}, (table) => [
+  primaryKey({ columns: [table.subtaskId, table.entryId] }),
+  index("todo_subtask_checks_entry_idx").on(table.entryId),
+]);
+
 export const insertTodoListSchema = createInsertSchema(todoListsTable).omit({ id: true, createdAt: true });
 export const insertTodoTaskSchema = createInsertSchema(todoTasksTable).omit({ id: true, createdAt: true });
 export const insertTodoEntrySchema = createInsertSchema(todoEntriesTable).omit({ id: true, createdAt: true });
@@ -74,6 +107,7 @@ export const insertTodoEntrySchema = createInsertSchema(todoEntriesTable).omit({
 export type TodoList = typeof todoListsTable.$inferSelect;
 export type TodoTask = typeof todoTasksTable.$inferSelect;
 export type TodoEntry = typeof todoEntriesTable.$inferSelect;
+export type TodoSubtask = typeof todoSubtasksTable.$inferSelect;
 export type InsertTodoList = z.infer<typeof insertTodoListSchema>;
 export type InsertTodoTask = z.infer<typeof insertTodoTaskSchema>;
 export type InsertTodoEntry = z.infer<typeof insertTodoEntrySchema>;

@@ -567,7 +567,13 @@ export const ListTodoEntriesResponseItem = zod.object({
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
   "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number()
+  "sortOrder": zod.number(),
+  "subtasks": zod.array(zod.object({
+  "id": zod.number(),
+  "text": zod.string(),
+  "sortOrder": zod.number(),
+  "done": zod.boolean()
+})).describe('The task\'s subtasks, with whether each is ticked on this day')
 }).describe('A task as it stands on one calendar day')
 export const ListTodoEntriesResponse = zod.array(ListTodoEntriesResponseItem)
 
@@ -599,7 +605,13 @@ export const CreateTodoEntryResponse = zod.object({
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
   "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number()
+  "sortOrder": zod.number(),
+  "subtasks": zod.array(zod.object({
+  "id": zod.number(),
+  "text": zod.string(),
+  "sortOrder": zod.number(),
+  "done": zod.boolean()
+})).describe('The task\'s subtasks, with whether each is ticked on this day')
 }).describe('A task as it stands on one calendar day')
 
 
@@ -645,7 +657,13 @@ export const UpdateTodoEntryResponse = zod.object({
   "projectId": zod.number().nullish(),
   "subprojectId": zod.number().nullish(),
   "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
-  "sortOrder": zod.number()
+  "sortOrder": zod.number(),
+  "subtasks": zod.array(zod.object({
+  "id": zod.number(),
+  "text": zod.string(),
+  "sortOrder": zod.number(),
+  "done": zod.boolean()
+})).describe('The task\'s subtasks, with whether each is ticked on this day')
 }).describe('A task as it stands on one calendar day')
 
 
@@ -687,6 +705,96 @@ export const UpdateTodoTaskResponse = zod.object({
   "reminderTime": zod.string().nullish(),
   "sortOrder": zod.number()
 })
+
+
+/**
+ * @summary Add a subtask to a task (it shows on every day the task is on)
+ */
+export const CreateTodoSubtaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const CreateTodoSubtaskBody = zod.object({
+  "text": zod.string().min(1),
+  "sortOrder": zod.number().optional()
+})
+
+export const CreateTodoSubtaskResponse = zod.object({
+  "id": zod.number(),
+  "taskId": zod.number(),
+  "text": zod.string(),
+  "sortOrder": zod.number()
+})
+
+
+/**
+ * @summary Rename or reorder a subtask
+ */
+export const UpdateTodoSubtaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+
+
+
+export const UpdateTodoSubtaskBody = zod.object({
+  "text": zod.string().min(1).optional(),
+  "sortOrder": zod.number().optional()
+})
+
+export const UpdateTodoSubtaskResponse = zod.object({
+  "id": zod.number(),
+  "taskId": zod.number(),
+  "text": zod.string(),
+  "sortOrder": zod.number()
+})
+
+
+/**
+ * @summary Delete a subtask from its task (on every day)
+ */
+export const DeleteTodoSubtaskParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const DeleteTodoSubtaskResponse = zod.void()
+
+
+/**
+ * @summary Tick or untick a subtask on one day's entry
+ */
+export const SetTodoSubtaskDoneParams = zod.object({
+  "id": zod.coerce.number(),
+  "subtaskId": zod.coerce.number()
+})
+
+export const SetTodoSubtaskDoneBody = zod.object({
+  "done": zod.boolean()
+})
+
+export const SetTodoSubtaskDoneResponse = zod.object({
+  "id": zod.number(),
+  "taskId": zod.number(),
+  "listId": zod.number(),
+  "date": zod.string().describe('YYYY-MM-DD'),
+  "status": zod.enum(['pending', 'done']),
+  "copiedFromDate": zod.string().nullish().describe('YYYY-MM-DD this entry was carried over from; null if it was created on this day'),
+  "completedAt": zod.string().nullish(),
+  "text": zod.string(),
+  "projectId": zod.number().nullish(),
+  "subprojectId": zod.number().nullish(),
+  "reminderTime": zod.string().nullish().describe('HH:mm; opt-in reminder time of day'),
+  "sortOrder": zod.number(),
+  "subtasks": zod.array(zod.object({
+  "id": zod.number(),
+  "text": zod.string(),
+  "sortOrder": zod.number(),
+  "done": zod.boolean()
+})).describe('The task\'s subtasks, with whether each is ticked on this day')
+}).describe('A task as it stands on one calendar day')
 
 
 /**

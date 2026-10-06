@@ -15,6 +15,7 @@ import { todoListsTable, todoEntriesTable } from "@workspace/db/schema";
 import {
   ensureRolledOver, listEntries, daySummary, createEntry, setEntryStatus,
   deleteEntry, updateTask, clearCompleted,
+  createSubtask, updateSubtask, deleteSubtask, setSubtaskDone,
 } from "./todo-days";
 
 const MIGRATIONS = path.resolve(process.cwd(), "../../lib/db/drizzle");
@@ -176,6 +177,69 @@ test("moving a task to another list moves today's entry but not history", () => 
   assert.deepEqual(entriesOf(a.task.id).map(e => [e.date, e.listId]), [["2026-12-10", from.id], ["2026-12-11", to.id]]);
   setDay("2026-12-12");
   assert.deepEqual(entriesOf(a.task.id).map(e => [e.date, e.listId]).at(-1), ["2026-12-12", to.id]);
+});
+
+// ── subtasks ──────────────────────────────────────────────────────────────────
+function ticks(taskId: number) {
+  return entriesOf(taskId).map(e => {
+    const entry = listEntries({ date: e.date }).find(r => r.entry.id === e.id)!;
+    return `${e.date}:${entry.subtasks.map(s => `${s.text}${s.done ? "✓" : ""}`).join(",")}`;
+  });
+}
+
+test("subtasks: carried copies keep the ticks of the day before; later ticks stay on their day", () => {
+  setDay("2027-01-01");
+  const list = newList("Sub carry", "carry");
+  const a = createEntry({ listId: list.id, text: "A" })!;
+  const s1 = createSubtask(a.task.id, { text: "s1" })!;
+  const s2 = createSubtask(a.task.id, { text: "s2" })!;
+  assert.equal(s2.sortOrder, s1.sortOrder + 1, "new subtasks go last");
+  setSubtaskDone(a.entry.id, s1.id, true);
+  setDay("2027-01-02");
+  setSubtaskDone(entriesOf(a.task.id)[1].id, s2.id, true);
+  assert.deepEqual(ticks(a.task.id), ["2027-01-01:s1✓,s2", "2027-01-02:s1✓,s2✓"]);
+  // Ticking subtasks doesn't complete the task or change percentages.
+  assert.deepEqual(summaryFor(list.id, "2027-01-01", "2027-01-31"), { "2027-01-01": "0/1", "2027-01-02": "0/1" });
+});
+
+test("subtasks: un-completing a past entry carries its ticks forward", () => {
+  setDay("2027-01-10");
+  const list = newList("Sub recarry", "carry");
+  const a = createEntry({ listId: list.id, text: "A" })!;
+  const s1 = createSubtask(a.task.id, { text: "s1" })!;
+  setSubtaskDone(a.entry.id, s1.id, true);
+  setEntryStatus(a.entry.id, "done");
+  setDay("2027-01-12");
+  setEntryStatus(a.entry.id, "pending");
+  assert.deepEqual(ticks(a.task.id), ["2027-01-10:s1✓", "2027-01-11:s1✓", "2027-01-12:s1✓"]);
+});
+
+test("subtasks: repeat lists start every day unticked", () => {
+  setDay("2027-02-01");
+  const list = newList("Sub repeat", "repeat");
+  const a = createEntry({ listId: list.id, text: "A" })!;
+  const s1 = createSubtask(a.task.id, { text: "s1" })!;
+  setSubtaskDone(a.entry.id, s1.id, true);
+  setDay("2027-02-02");
+  assert.deepEqual(ticks(a.task.id), ["2027-02-01:s1✓", "2027-02-02:s1"]);
+});
+
+test("subtasks: rename, reorder, untick, delete; ticks must match the entry's task", () => {
+  setDay("2027-03-01");
+  const list = newList("Sub edit", "none");
+  const a = createEntry({ listId: list.id, text: "A" })!;
+  const b = createEntry({ listId: list.id, text: "B" })!;
+  const s1 = createSubtask(a.task.id, { text: "s1" })!;
+  const s2 = createSubtask(a.task.id, { text: "s2" })!;
+  assert.equal(setSubtaskDone(b.entry.id, s1.id, true), null, "subtask of another task");
+  assert.equal(createSubtask(999999, { text: "x" }), null);
+  updateSubtask(s1.id, { text: "first", sortOrder: 5 });
+  setSubtaskDone(a.entry.id, s2.id, true);
+  assert.deepEqual(ticks(a.task.id), ["2027-03-01:s2✓,first"]);
+  setSubtaskDone(a.entry.id, s2.id, false);
+  assert.ok(deleteSubtask(s1.id));
+  assert.ok(!deleteSubtask(s1.id));
+  assert.deepEqual(ticks(a.task.id), ["2027-03-01:s2"]);
 });
 
 // ── data migration from the old model ─────────────────────────────────────────

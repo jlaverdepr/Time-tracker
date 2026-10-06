@@ -231,6 +231,13 @@ export const TodoEntryStatus = {
   done: 'done',
 } as const;
 
+export interface TodoEntrySubtask {
+  id: number;
+  text: string;
+  sortOrder: number;
+  done: boolean;
+}
+
 /**
  * A task as it stands on one calendar day
  */
@@ -259,6 +266,31 @@ export interface TodoEntry {
      */
   reminderTime?: string | null;
   sortOrder: number;
+  /** The task's subtasks, with whether each is ticked on this day */
+  subtasks: TodoEntrySubtask[];
+}
+
+export interface TodoSubtask {
+  id: number;
+  taskId: number;
+  text: string;
+  sortOrder: number;
+}
+
+export interface TodoSubtaskInput {
+  /** @minLength 1 */
+  text: string;
+  sortOrder?: number;
+}
+
+export interface TodoSubtaskUpdate {
+  /** @minLength 1 */
+  text?: string;
+  sortOrder?: number;
+}
+
+export interface TodoSubtaskCheck {
+  done: boolean;
 }
 
 export interface TodoEntryInput {

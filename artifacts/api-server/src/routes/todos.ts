@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { todoListsTable } from "@workspace/db/schema";
-import type { TodoList, TodoTask } from "@workspace/db/schema";
+import type { TodoList, TodoTask, TodoSubtask } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 import {
   CreateTodoListBody, UpdateTodoListParams, UpdateTodoListBody, DeleteTodoListParams,
@@ -9,6 +9,9 @@ import {
   ListTodoEntriesQueryParams, CreateTodoEntryBody, GetTodoDaySummaryQueryParams,
   UpdateTodoEntryParams, UpdateTodoEntryBody, DeleteTodoEntryParams,
   UpdateTodoTaskParams, UpdateTodoTaskBody,
+  CreateTodoSubtaskParams, CreateTodoSubtaskBody, CreateTodoSubtaskResponse,
+  UpdateTodoSubtaskParams, UpdateTodoSubtaskBody, UpdateTodoSubtaskResponse,
+  DeleteTodoSubtaskParams, SetTodoSubtaskDoneParams, SetTodoSubtaskDoneBody, SetTodoSubtaskDoneResponse,
   ListTodoListsResponse, CreateTodoListResponse, UpdateTodoListResponse,
   ClearCompletedTodoEntriesResponse,
   ListTodoEntriesResponse, CreateTodoEntryResponse, GetTodoDaySummaryResponse,
@@ -17,13 +20,14 @@ import {
 import {
   ensureRolledOver, todayStr, serializeEntry, listEntries, daySummary,
   createEntry, setEntryStatus, deleteEntry, updateTask, clearCompleted,
+  createSubtask, updateSubtask, deleteSubtask, setSubtaskDone,
 } from "../lib/todo-days";
 
 const router = Router();
 
 // Every to-do request first materializes any days that started since the
 // last one (the server may have been asleep at midnight).
-router.use(["/todo-lists", "/todo-entries", "/todo-tasks"], (_req, _res, next) => {
+router.use(["/todo-lists", "/todo-entries", "/todo-tasks", "/todo-subtasks"], (_req, _res, next) => {
   ensureRolledOver();
   next();
 });
@@ -51,6 +55,10 @@ function serializeTask(row: TodoTask) {
     reminderTime: row.reminderTime ?? null,
     sortOrder: row.sortOrder,
   };
+}
+
+function serializeSubtask(row: TodoSubtask) {
+  return { id: row.id, taskId: row.taskId, text: row.text, sortOrder: row.sortOrder };
 }
 
 // ─── todo lists ────────────────────────────────────────────────────────────────
@@ -140,6 +148,16 @@ router.patch("/todo-entries/:id", async (req, res): Promise<void> => {
   res.json(UpdateTodoEntryResponse.parse(serializeEntry(updated)));
 });
 
+router.put("/todo-entries/:id/subtasks/:subtaskId", async (req, res): Promise<void> => {
+  const params = SetTodoSubtaskDoneParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = SetTodoSubtaskDoneBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const updated = setSubtaskDone(params.data.id, params.data.subtaskId, parsed.data.done);
+  if (!updated) { res.status(404).json({ error: "Entry or subtask not found" }); return; }
+  res.json(SetTodoSubtaskDoneResponse.parse(serializeEntry(updated)));
+});
+
 router.delete("/todo-entries/:id", async (req, res): Promise<void> => {
   const parsed = DeleteTodoEntryParams.safeParse(req.params);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
@@ -165,6 +183,37 @@ router.patch("/todo-tasks/:id", async (req, res): Promise<void> => {
   const task = updateTask(params.data.id, updates);
   if (!task) { res.status(404).json({ error: "Task not found" }); return; }
   res.json(UpdateTodoTaskResponse.parse(serializeTask(task)));
+});
+
+
+// ─── subtasks ──────────────────────────────────────────────────────────────────
+
+router.post("/todo-tasks/:id/subtasks", async (req, res): Promise<void> => {
+  const params = CreateTodoSubtaskParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = CreateTodoSubtaskBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const subtask = createSubtask(params.data.id, parsed.data);
+  if (!subtask) { res.status(404).json({ error: "Task not found" }); return; }
+  res.status(201).json(CreateTodoSubtaskResponse.parse(serializeSubtask(subtask)));
+});
+
+router.patch("/todo-subtasks/:id", async (req, res): Promise<void> => {
+  const params = UpdateTodoSubtaskParams.safeParse(req.params);
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const parsed = UpdateTodoSubtaskBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  if (parsed.data.text === undefined && parsed.data.sortOrder === undefined) { res.status(400).json({ error: "Nothing to update" }); return; }
+  const subtask = updateSubtask(params.data.id, parsed.data);
+  if (!subtask) { res.status(404).json({ error: "Subtask not found" }); return; }
+  res.json(UpdateTodoSubtaskResponse.parse(serializeSubtask(subtask)));
+});
+
+router.delete("/todo-subtasks/:id", async (req, res): Promise<void> => {
+  const parsed = DeleteTodoSubtaskParams.safeParse(req.params);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  if (!deleteSubtask(parsed.data.id)) { res.status(404).json({ error: "Subtask not found" }); return; }
+  res.status(204).send();
 });
 
 export default router;

@@ -69,6 +69,10 @@ import type {
   TodoList,
   TodoListInput,
   TodoListUpdate,
+  TodoSubtask,
+  TodoSubtaskCheck,
+  TodoSubtaskInput,
+  TodoSubtaskUpdate,
   TodoTask,
   TodoTaskUpdate
 } from './api.schemas';
@@ -2548,6 +2552,291 @@ export const useUpdateTodoTask = <TError = ErrorType<void>,
         TContext
       > => {
       return useMutation(getUpdateTodoTaskMutationOptions(options));
+    }
+
+export const getCreateTodoSubtaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-tasks/${id}/subtasks`
+}
+
+/**
+ * @summary Add a subtask to a task (it shows on every day the task is on)
+ */
+export const createTodoSubtask = async (id: number,
+    todoSubtaskInput: TodoSubtaskInput, options?: RequestInit): Promise<TodoSubtask> => {
+
+  return customFetch<TodoSubtask>(getCreateTodoSubtaskUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoSubtaskInput)
+  }
+);}
+
+
+
+
+export const getCreateTodoSubtaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTodoSubtask>>, TError,{id: number;data: BodyType<TodoSubtaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createTodoSubtask>>, TError,{id: number;data: BodyType<TodoSubtaskInput>}, TContext> => {
+
+const mutationKey = ['createTodoSubtask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createTodoSubtask>>, {id: number;data: BodyType<TodoSubtaskInput>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  createTodoSubtask(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateTodoSubtaskMutationResult = NonNullable<Awaited<ReturnType<typeof createTodoSubtask>>>
+    export type CreateTodoSubtaskMutationBody = BodyType<TodoSubtaskInput>
+    export type CreateTodoSubtaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Add a subtask to a task (it shows on every day the task is on)
+ */
+export const useCreateTodoSubtask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createTodoSubtask>>, TError,{id: number;data: BodyType<TodoSubtaskInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createTodoSubtask>>,
+        TError,
+        {id: number;data: BodyType<TodoSubtaskInput>},
+        TContext
+      > => {
+      return useMutation(getCreateTodoSubtaskMutationOptions(options));
+    }
+
+export const getUpdateTodoSubtaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-subtasks/${id}`
+}
+
+/**
+ * @summary Rename or reorder a subtask
+ */
+export const updateTodoSubtask = async (id: number,
+    todoSubtaskUpdate: TodoSubtaskUpdate, options?: RequestInit): Promise<TodoSubtask> => {
+
+  return customFetch<TodoSubtask>(getUpdateTodoSubtaskUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoSubtaskUpdate)
+  }
+);}
+
+
+
+
+export const getUpdateTodoSubtaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTodoSubtask>>, TError,{id: number;data: BodyType<TodoSubtaskUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateTodoSubtask>>, TError,{id: number;data: BodyType<TodoSubtaskUpdate>}, TContext> => {
+
+const mutationKey = ['updateTodoSubtask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateTodoSubtask>>, {id: number;data: BodyType<TodoSubtaskUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateTodoSubtask(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateTodoSubtaskMutationResult = NonNullable<Awaited<ReturnType<typeof updateTodoSubtask>>>
+    export type UpdateTodoSubtaskMutationBody = BodyType<TodoSubtaskUpdate>
+    export type UpdateTodoSubtaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Rename or reorder a subtask
+ */
+export const useUpdateTodoSubtask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateTodoSubtask>>, TError,{id: number;data: BodyType<TodoSubtaskUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateTodoSubtask>>,
+        TError,
+        {id: number;data: BodyType<TodoSubtaskUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateTodoSubtaskMutationOptions(options));
+    }
+
+export const getDeleteTodoSubtaskUrl = (id: number,) => {
+
+
+
+
+  return `/api/todo-subtasks/${id}`
+}
+
+/**
+ * @summary Delete a subtask from its task (on every day)
+ */
+export const deleteTodoSubtask = async (id: number, options?: RequestInit): Promise<void> => {
+
+  return customFetch<void>(getDeleteTodoSubtaskUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteTodoSubtaskMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTodoSubtask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteTodoSubtask>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['deleteTodoSubtask'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteTodoSubtask>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteTodoSubtask(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteTodoSubtaskMutationResult = NonNullable<Awaited<ReturnType<typeof deleteTodoSubtask>>>
+
+    export type DeleteTodoSubtaskMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a subtask from its task (on every day)
+ */
+export const useDeleteTodoSubtask = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteTodoSubtask>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteTodoSubtask>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getDeleteTodoSubtaskMutationOptions(options));
+    }
+
+export const getSetTodoSubtaskDoneUrl = (id: number,
+    subtaskId: number,) => {
+
+
+
+
+  return `/api/todo-entries/${id}/subtasks/${subtaskId}`
+}
+
+/**
+ * @summary Tick or untick a subtask on one day's entry
+ */
+export const setTodoSubtaskDone = async (id: number,
+    subtaskId: number,
+    todoSubtaskCheck: TodoSubtaskCheck, options?: RequestInit): Promise<TodoEntry> => {
+
+  return customFetch<TodoEntry>(getSetTodoSubtaskDoneUrl(id,subtaskId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(todoSubtaskCheck)
+  }
+);}
+
+
+
+
+export const getSetTodoSubtaskDoneMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTodoSubtaskDone>>, TError,{id: number;subtaskId: number;data: BodyType<TodoSubtaskCheck>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setTodoSubtaskDone>>, TError,{id: number;subtaskId: number;data: BodyType<TodoSubtaskCheck>}, TContext> => {
+
+const mutationKey = ['setTodoSubtaskDone'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setTodoSubtaskDone>>, {id: number;subtaskId: number;data: BodyType<TodoSubtaskCheck>}> = (props) => {
+          const {id,subtaskId,data} = props ?? {};
+
+          return  setTodoSubtaskDone(id,subtaskId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetTodoSubtaskDoneMutationResult = NonNullable<Awaited<ReturnType<typeof setTodoSubtaskDone>>>
+    export type SetTodoSubtaskDoneMutationBody = BodyType<TodoSubtaskCheck>
+    export type SetTodoSubtaskDoneMutationError = ErrorType<void>
+
+    /**
+ * @summary Tick or untick a subtask on one day's entry
+ */
+export const useSetTodoSubtaskDone = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setTodoSubtaskDone>>, TError,{id: number;subtaskId: number;data: BodyType<TodoSubtaskCheck>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setTodoSubtaskDone>>,
+        TError,
+        {id: number;subtaskId: number;data: BodyType<TodoSubtaskCheck>},
+        TContext
+      > => {
+      return useMutation(getSetTodoSubtaskDoneMutationOptions(options));
     }
 
 export const getListGymExercisesUrl = () => {
